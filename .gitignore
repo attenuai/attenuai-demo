@@ -136,6 +136,10 @@ celerybeat.pid
 
 # Environments
 .env
+token.json
+credentials.json
+__pycache__/
+*.pyc
 .envrc
 .venv
 env/

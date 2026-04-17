@@ -1,0 +1,10 @@
+services:
+  content-server:
+    build: ./content-server
+    ports:
+      - "8081:8081"
+
+  exfil-server:
+    build: ./exfil-server
+    ports:
+      - "8082:8082"

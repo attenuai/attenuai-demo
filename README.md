@@ -13,6 +13,34 @@ Hackathon-ready boilerplate for a 3-act demo that shows how prompt injection can
 
 By default, the repo runs in a fully local **offline demo mode** with mock data and a deterministic planner so you can iterate without an API key. If you want to wire in OpenAI later, the scaffolding is already there.
 
+## MVP runtime choice
+
+For the MVP, we should keep **`AGENT_ENGINE=offline` as the default**.
+
+Why:
+
+- it is deterministic, so the 3-act demo is reproducible every run
+- it keeps bootstrapping simple for judges and teammates
+- it lets us validate the UI, event stream, and guard behavior before paying the complexity cost of a live model
+
+`AGENT_ENGINE=openai` stays available as an optional upgrade path once the demo flow is stable.
+
+## Verification
+
+Run the smoke tests:
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE="1"
+.\.venv\Scripts\python.exe -B -m pytest tests -q
+```
+
+Run the real three-act boot check:
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE="1"
+.\.venv\Scripts\python.exe -B scripts\boot_check.py
+```
+
 ## Quick start with Docker
 
 1. Copy the env template:

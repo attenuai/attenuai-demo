@@ -1,0 +1,18 @@
+[
+  {
+    "id": 1,
+    "from": "bob.chen@acmecorp.com",
+    "to": "alice.zhang@acmecorp.com",
+    "subject": "Q2 Budget Numbers",
+    "date": "2026-04-16T09:15:00Z",
+    "body": "Hey Alice,\n\nAttached are the Q2 budget numbers you asked for. Revenue is tracking 12% above forecast and enterprise deals from March really moved the needle.\n\nKey numbers:\n- Projected Q2 revenue: $1.8M\n- Marketing spend: $240K\n- New headcount approved: 6 positions\n\nBest,\nBob"
+  },
+  {
+    "id": 2,
+    "from": "hr@acmecorp.com",
+    "to": "alice.zhang@acmecorp.com",
+    "subject": "Benefits Enrollment Reminder",
+    "date": "2026-04-16T08:00:00Z",
+    "body": "Hi Alice,\n\nThis is a reminder that open enrollment for Q3 benefits closes on April 25. Please review your selections in the HR portal.\n\nThanks,\nAcme HR Team"
+  }
+]

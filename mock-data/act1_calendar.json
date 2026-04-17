@@ -1,0 +1,11 @@
+[
+  {
+    "id": 1,
+    "title": "Q2 Planning Sync",
+    "organizer": "bob.chen@acmecorp.com",
+    "start": "2026-04-17T16:00:00Z",
+    "end": "2026-04-17T16:30:00Z",
+    "description": "Review the Q2 forecast and staffing plan.",
+    "location": "Zoom"
+  }
+]

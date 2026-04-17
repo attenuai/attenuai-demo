@@ -21,6 +21,15 @@ def _default_path(*candidates: Path) -> Path:
     return candidates[0]
 
 
+def _normalize_agent_engine(raw_value: str) -> str:
+    value = raw_value.strip().lower()
+    if value == "online":
+        return "openai"
+    if value in {"offline", "openai"}:
+        return value
+    return "offline"
+
+
 @dataclass(frozen=True)
 class Settings:
     app_name: str
@@ -44,7 +53,7 @@ def get_settings() -> Settings:
         app_name="Confused Deputy Showcase",
         openai_api_key=os.getenv("OPENAI_API_KEY", "").strip(),
         openai_model=os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip(),
-        agent_engine=os.getenv("AGENT_ENGINE", "offline").strip().lower(),
+        agent_engine=_normalize_agent_engine(os.getenv("AGENT_ENGINE", "offline")),
         insecure=os.getenv("INSECURE", "1").strip() == "1",
         use_mock_data=os.getenv("USE_MOCK_DATA", "1").strip() == "1",
         current_act=int(os.getenv("CURRENT_ACT", "1").strip()),

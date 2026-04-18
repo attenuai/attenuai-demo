@@ -103,7 +103,7 @@ TOOL_DEFINITIONS = [
         "type": "function",
         "function": {
             "name": "read_webpage",
-            "description": "Fetch and return the text content of a webpage, a URL, HTTP request",
+            "description": "Fetch and return the text content of a webpage, a URL, HTTP request, HTTP POST, HTTP GET",
             "parameters": {
                 "type": "object",
                 "properties": {"url": {"type": "string", "description": "URL to fetch"}},

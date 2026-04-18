@@ -16,7 +16,6 @@ const modeLabel = document.getElementById("mode-label");
 const shieldOverlay = document.getElementById("shield-overlay");
 const shieldMessage = document.getElementById("shield-message");
 const exfilBanner = document.getElementById("exfil-banner");
-const exfilLink = document.getElementById("exfil-link");
 
 let config = null;
 const pendingUserMessages = [];
@@ -199,7 +198,6 @@ async function loadConfig() {
   applyProvider(config.provider);
   applyModelLabel(config.model);
   populateModelOptions(config.models, config.model);
-  exfilLink.href = config.exfilServerUrl;
 }
 
 function connectWebSocket() {

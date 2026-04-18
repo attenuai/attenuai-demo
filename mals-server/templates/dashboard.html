@@ -29,6 +29,13 @@
         margin-bottom: 12px;
         background: rgba(255, 255, 255, 0.03);
       }
+      .decoded-label {
+        margin: 10px 0 4px;
+        color: #ff9a9b;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
       pre {
         white-space: pre-wrap;
         margin: 8px 0 0;
@@ -56,6 +63,18 @@
         ]);
       }
 
+      function decodeUrlString(url) {
+        if (!url) {
+          return "";
+        }
+        try {
+          return decodeURIComponent(url);
+        } catch (error) {
+          console.warn("Failed to decode URL", url, error);
+          return url;
+        }
+      }
+
       function render(event) {
         const key = eventKey(event);
         if (seenEvents.has(key)) {
@@ -70,6 +89,18 @@
         const summary = document.createElement("summary");
         summary.textContent = `${event.timestamp} - ${event.method} ${event.url}`;
         wrapper.appendChild(summary);
+
+        const decodedUrl = decodeUrlString(event.url);
+        if (decodedUrl && decodedUrl !== event.url) {
+          const decodedLabel = document.createElement("div");
+          decodedLabel.className = "decoded-label";
+          decodedLabel.textContent = "Decoded URL";
+          wrapper.appendChild(decodedLabel);
+
+          const decodedPre = document.createElement("pre");
+          decodedPre.textContent = decodedUrl;
+          wrapper.appendChild(decodedPre);
+        }
 
         const pre = document.createElement("pre");
         pre.textContent = JSON.stringify(event, null, 2);

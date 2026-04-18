@@ -11,10 +11,8 @@ flowchart LR
 
 ## Runtime modes
 
-- `INSECURE=1`: raw tool execution
-- `INSECURE=0`: guarded tool execution
-- `CURRENT_ACT=1`: clean inbox + clean calendar
-- `CURRENT_ACT=2`: malicious inbox + calendar payloads enabled
+- The UI toggle switches between insecure raw tool execution and secure guarded tool execution.
+- Mock data is loaded from a single default dataset in `mock-data/`.
 - `AGENT_ENGINE=offline`: deterministic local planner for development
 - `AGENT_ENGINE=openai`: Chat Completions tool-calling flow
 

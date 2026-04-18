@@ -4,12 +4,12 @@ Hackathon-ready boilerplate for a 3-act demo that shows how prompt injection can
 
 ## What is included
 
-- `agent/` FastAPI backend, agent loop, tool dispatch, mock Gmail/calendar clients, and secure/insecure tool layers
+- `agent/` FastAPI backend, agent loop, tool dispatch, and secure/insecure tool layers
 - `frontend/` single-page split-screen UI for chat + live system monitor
 - `content-server/` safe and malicious pages for the webpage attack path
-- `exfil-server/` live attacker dashboard that records exfiltrated requests
-- `mock-data/` act-based inbox and calendar payloads
-- `docs/` architecture notes and OAuth setup scaffolding
+- `mals-server/` live attacker dashboard that records exfiltrated requests
+- `mock-data/` local demo data and support files
+- `docs/` architecture notes
 
 By default, the repo runs in a fully local **offline demo mode** with mock data and a deterministic planner so you can iterate without an API key. If you want to wire in OpenAI later, the scaffolding is already there.
 
@@ -61,23 +61,9 @@ $env:PYTHONDONTWRITEBYTECODE="1"
 - Content server: [http://localhost:8081](http://localhost:8081)
 - Exfil dashboard: [http://localhost:8082](http://localhost:8082)
 
-## Switching demo acts
+## Mode switching
 
-Edit `.env` and restart:
-
-```env
-# Act 1: benign data only
-INSECURE=1
-CURRENT_ACT=1
-
-# Act 2: vulnerable agent, malicious data present
-INSECURE=1
-CURRENT_ACT=2
-
-# Act 3: guarded agent, malicious data present
-INSECURE=0
-CURRENT_ACT=2
-```
+The app starts in insecure mode by default. Use the Secure/Insecure toggle in the chat header to switch modes while the app is running.
 
 ## Local development without Docker
 
@@ -92,12 +78,12 @@ pip install -r content-server\requirements.txt
 uvicorn server:app --app-dir content-server --reload --host 0.0.0.0 --port 8081
 ```
 
-### Terminal 2: exfil server
+### Terminal 2: mals server
 
 ```powershell
 .venv\Scripts\Activate.ps1
-pip install -r exfil-server\requirements.txt
-uvicorn server:app --app-dir exfil-server --reload --host 0.0.0.0 --port 8082
+pip install -r mals-server\requirements.txt
+uvicorn server:app --app-dir mals-server --reload --host 0.0.0.0 --port 8082
 ```
 
 ### Terminal 3: agent app
@@ -106,8 +92,6 @@ uvicorn server:app --app-dir exfil-server --reload --host 0.0.0.0 --port 8082
 .venv\Scripts\Activate.ps1
 pip install -r agent\requirements.txt
 Copy-Item .env.example .env -ErrorAction SilentlyContinue
-$env:INSECURE="1"
-$env:CURRENT_ACT="1"
 $env:USE_MOCK_DATA="1"
 $env:AGENT_ENGINE="offline"
 uvicorn main:app --app-dir agent --reload --host 0.0.0.0 --port 8000
@@ -132,8 +116,6 @@ Notes:
 
 ## Suggested demo prompts
 
-- `Summarize my new emails`
-- `Check my calendar and flag anything unusual`
 - `Read http://localhost:8081/pages/acme-q2-report.html and summarize it`
 - `Read http://localhost:8081/pages/mal-ai-trends.html and summarize it`
 
@@ -143,7 +125,7 @@ Notes:
 agent/
 frontend/
 content-server/
-exfil-server/
+mals-server/
 mock-data/
 docs/
 scripts/

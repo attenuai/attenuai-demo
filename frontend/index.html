@@ -17,18 +17,37 @@
           <div class="header-controls">
             <button id="new-chat-button" class="button-secondary" type="button">New chat</button>
             <div class="status-group">
-            <span id="mode-badge" class="badge">Loading...</span>
-            <span id="engine-badge" class="badge badge-muted">engine</span>
+              <div class="model-picker">
+                <button id="model-button" class="button-secondary model-button" type="button" aria-haspopup="dialog" aria-expanded="false">
+                  <span id="model-label">Model</span>
+                </button>
+                <div id="model-popup" class="model-popup" hidden>
+                  <p class="model-popup-title">Select model</p>
+                  <select id="model-select" aria-label="Available models"></select>
+                  <button id="model-apply-button" class="button-secondary" type="button">Apply model</button>
+                </div>
+              </div>
+              <button id="provider-badge" class="provider-toggle button-secondary" type="button">
+                <span id="provider-label">OpenAI</span>
+              </button>
+              <div class="capability-picker">
+                <button id="capability-button" class="capability-toggle button-secondary" type="button" aria-haspopup="dialog" aria-expanded="false">
+                  <span id="capability-label">Capabilities</span>
+                </button>
+                <div id="capability-popup" class="model-popup capability-popup" hidden>
+                  <div class="popup-header">
+                    <p class="model-popup-title">Capabilities</p>
+                    <div class="popup-actions">
+                      <button id="capability-insecure-button" class="button-secondary popup-insecure-button" type="button">Insecure</button>
+                      <button id="capability-close-button" class="button-secondary popup-close-button" type="button">Close</button>
+                    </div>
+                  </div>
+                  <div id="capability-list" class="capability-list" role="group" aria-label="Capability selection"></div>
+                </div>
+              </div>
             </div>
           </div>
         </header>
-
-        <div class="quick-actions">
-          <button data-prompt="Summarize my new emails">Summarize emails</button>
-          <button data-prompt="Check my calendar and flag anything unusual">Check calendar</button>
-          <button data-prompt-key="safe-webpage">Safe webpage</button>
-          <button data-prompt-key="malicious-webpage">Malicious webpage</button>
-        </div>
 
         <div id="chat-log" class="chat-log"></div>
 
@@ -36,6 +55,11 @@
           <textarea id="chat-input" placeholder="Type a message..." rows="3"></textarea>
           <button id="send-button" type="submit">Send</button>
         </form>
+
+        <div class="quick-actions">
+          <button data-prompt-key="safe-webpage">Safe webpage</button>
+          <button data-prompt-key="malicious-webpage">Malicious webpage</button>
+        </div>
 
         <div id="shield-overlay" class="shield-overlay" hidden>
           <img src="/assets/shield.svg" alt="Shield" />
@@ -46,13 +70,20 @@
         </div>
       </section>
 
+      <div
+        id="pane-resizer"
+        class="pane-resizer"
+        role="separator"
+        aria-label="Resize panels"
+        aria-orientation="vertical"
+      ></div>
+
       <section class="pane pane-monitor">
         <header class="pane-header monitor-header">
           <div>
             <p class="eyebrow">Live Feed</p>
             <h2>System Monitor</h2>
           </div>
-          <a id="exfil-link" href="#" target="_blank" rel="noreferrer">Open exfil dashboard</a>
         </header>
 
         <div id="exfil-banner" class="banner banner-danger" hidden>[EXFILTRATED] Data left the system</div>

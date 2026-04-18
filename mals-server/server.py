@@ -9,7 +9,7 @@ from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 
 
-app = FastAPI(title="Exfil Server")
+app = FastAPI(title="Mals Server")
 TEMPLATE_PATH = Path(__file__).resolve().parent / "templates" / "dashboard.html"
 events: deque[dict] = deque(maxlen=200)
 connections: set[WebSocket] = set()
@@ -44,6 +44,14 @@ async def dashboard() -> str:
 @app.get("/api/events")
 async def get_events() -> list[dict]:
     return list(events)
+
+
+@app.post("/api/events/clear")
+async def clear_events() -> dict:
+    cleared = len(events)
+    events.clear()
+    await broadcast({"type": "cleared"})
+    return {"ok": True, "cleared": cleared}
 
 
 @app.websocket("/ws")

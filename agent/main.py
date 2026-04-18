@@ -69,6 +69,21 @@ async def chat(payload: ChatRequest) -> ChatResponse:
     )
 
 
+@app.post("/api/chat/reset")
+async def reset_chat() -> dict:
+    agent_loop.reset()
+    event_logger.clear()
+    await event_logger.broadcast(
+        "mode_change",
+        {
+            "mode": "insecure" if settings.insecure else "secure",
+            "engine": settings.agent_engine,
+            "act": settings.current_act,
+        },
+    )
+    return {"ok": True}
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket) -> None:
     await event_logger.connect(websocket)

@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 from calendar_client import CalendarClient
 from config import get_settings
 from tools_insecure import DANGER_RULES, TOOL_DEFINITIONS
+from tools_insecure import list_files as insecure_list_files
 from tools_insecure import _normalize_path
 from tools_insecure import list_calendar_events as insecure_list_calendar_events
 from tools_insecure import list_emails as insecure_list_emails
@@ -100,6 +101,10 @@ def read_webpage(url: str) -> dict:
     return insecure_read_webpage(url)
 
 
+def list_files(path: str = ".") -> dict:
+    return insecure_list_files(path)
+
+
 @guard_tool("read_file")
 def read_file(path: str) -> dict:
     return insecure_read_file(path)
@@ -113,5 +118,6 @@ TOOLS = {
     "read_calendar_event": read_calendar_event,
     "reject_calendar_invite": reject_calendar_invite,
     "read_webpage": read_webpage,
+    "list_files": list_files,
     "read_file": read_file,
 }

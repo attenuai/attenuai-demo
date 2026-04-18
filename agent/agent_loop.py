@@ -125,6 +125,9 @@ class OpenAIAgentLoop:
         self.settings = get_settings()
         self.messages: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
 
+    def reset(self) -> None:
+        self.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+
     async def _call_tool(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
         await event_logger.broadcast(
             "tool_call",
@@ -220,3 +223,6 @@ class AgentLoop:
         reply = await self.offline.handle(user_input)
         await event_logger.broadcast("assistant_message", {"content": reply})
         return reply
+
+    def reset(self) -> None:
+        self.openai.reset()

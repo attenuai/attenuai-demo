@@ -27,6 +27,9 @@ class EventLogger:
     def disconnect(self, websocket: WebSocket) -> None:
         self._connections.discard(websocket)
 
+    def clear(self) -> None:
+        self._history.clear()
+
     async def broadcast(self, event_type: str, data: dict) -> None:
         event = EventEnvelope.build(event_type, data)
         self._history.append(event)

@@ -3,6 +3,7 @@ const monitorLog = document.getElementById("monitor-log");
 const chatForm = document.getElementById("chat-form");
 const chatInput = document.getElementById("chat-input");
 const sendButton = document.getElementById("send-button");
+const newChatButton = document.getElementById("new-chat-button");
 const modeBadge = document.getElementById("mode-badge");
 const engineBadge = document.getElementById("engine-badge");
 const shieldOverlay = document.getElementById("shield-overlay");
@@ -11,6 +12,7 @@ const exfilBanner = document.getElementById("exfil-banner");
 const exfilLink = document.getElementById("exfil-link");
 
 let config = null;
+const pendingUserMessages = [];
 
 const promptBuilders = {
   "safe-webpage": (appConfig) =>
@@ -25,6 +27,13 @@ function appendChat(role, content) {
   div.textContent = content;
   chatLog.appendChild(div);
   chatLog.scrollTop = chatLog.scrollHeight;
+}
+
+function clearConversation() {
+  chatLog.textContent = "";
+  monitorLog.textContent = "";
+  shieldOverlay.hidden = true;
+  exfilBanner.hidden = true;
 }
 
 function appendMonitor(title, payload, level = "normal", blocked = false) {
@@ -76,6 +85,10 @@ function connectWebSocket() {
     const { type, data } = envelope;
 
     if (type === "user_message") {
+      if (pendingUserMessages[0] === data.content) {
+        pendingUserMessages.shift();
+        return;
+      }
       appendChat("user", data.content);
       return;
     }
@@ -122,6 +135,9 @@ chatForm.addEventListener("submit", async (event) => {
     return;
   }
 
+  pendingUserMessages.push(message);
+  appendChat("user", message);
+  chatInput.value = "";
   sendButton.disabled = true;
   try {
     await fetch("/api/chat", {
@@ -129,10 +145,21 @@ chatForm.addEventListener("submit", async (event) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message }),
     });
-    chatInput.value = "";
   } finally {
     sendButton.disabled = false;
     chatInput.focus();
+  }
+});
+
+newChatButton.addEventListener("click", async () => {
+  newChatButton.disabled = true;
+  try {
+    await fetch("/api/chat/reset", { method: "POST" });
+    clearConversation();
+    chatInput.value = "";
+    chatInput.focus();
+  } finally {
+    newChatButton.disabled = false;
   }
 });
 

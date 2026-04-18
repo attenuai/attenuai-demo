@@ -80,6 +80,14 @@ body {
   flex-wrap: wrap;
 }
 
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .badge {
   border-radius: 999px;
   padding: 8px 12px;
@@ -107,6 +115,16 @@ body {
   padding: 10px 14px;
   background: var(--blue);
   color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button-secondary {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 14px;
+  background: var(--surface);
+  color: var(--text);
   font-weight: 600;
   cursor: pointer;
 }

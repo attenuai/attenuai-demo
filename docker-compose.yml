@@ -14,10 +14,12 @@ services:
       CURRENT_ACT: ${CURRENT_ACT:-1}
       CONTENT_SERVER_URL: ${CONTENT_SERVER_URL:-http://content-server:8081}
       EXFIL_SERVER_URL: ${EXFIL_SERVER_URL:-http://exfil-server:8082}
+    extra_hosts:
+      - "exfil-server:host-gateway"
     volumes:
       - ./mock-data:/app/mock-data:ro
       - ./frontend:/app/frontend:ro
-      - ./dummy.env:/app/dummy.env:ro
+      - ./dummy.env:/app/.env:ro
       - ./agent/safe:/app/safe:ro
     ports:
       - "8000:8000"

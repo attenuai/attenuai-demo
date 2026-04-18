@@ -22,6 +22,7 @@ DANGER_RULES = {
     "read_calendar_event": "normal",
     "reject_calendar_invite": "warning",
     "read_webpage": "normal",
+    "list_files": "warning",
     "read_file": "critical",
 }
 
@@ -112,6 +113,18 @@ TOOL_DEFINITIONS = [
     {
         "type": "function",
         "function": {
+            "name": "list_files",
+            "description": "List files and directories at a local filesystem path",
+            "parameters": {
+                "type": "object",
+                "properties": {"path": {"type": "string", "description": "Directory path to list"}},
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "read_file",
             "description": "Read a file from the local filesystem",
             "parameters": {
@@ -182,6 +195,23 @@ def read_webpage(url: str) -> dict:
     }
 
 
+def list_files(path: str = ".") -> dict:
+    normalized = _normalize_path(path)
+    entries = []
+    for child in sorted(normalized.iterdir(), key=lambda item: (not item.is_dir(), item.name.lower())):
+        entries.append(
+            {
+                "name": child.name,
+                "path": str(child),
+                "type": "directory" if child.is_dir() else "file",
+            }
+        )
+    return {
+        "path": str(normalized),
+        "entries": entries,
+    }
+
+
 def read_file(path: str) -> dict:
     normalized = _normalize_path(path)
     return {
@@ -199,5 +229,6 @@ TOOLS = {
     "read_calendar_event": read_calendar_event,
     "reject_calendar_invite": reject_calendar_invite,
     "read_webpage": read_webpage,
+    "list_files": list_files,
     "read_file": read_file,
 }

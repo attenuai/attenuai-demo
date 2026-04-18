@@ -10,9 +10,9 @@ from fastapi.staticfiles import StaticFiles
 
 from agent_loop import AgentLoop, InteractionCanceled
 from config import current_provider, current_model, get_settings, provider_runtime_config, update_model, update_provider
-from dispatch import current_mode, update_mode
+from dispatch import capability_config, current_mode, update_capabilities, update_mode
 from logger import event_logger
-from models import ChatRequest, ChatResponse, ModeUpdateRequest, ModelUpdateRequest, ProviderUpdateRequest
+from models import CapabilityUpdateRequest, ChatRequest, ChatResponse, ModeUpdateRequest, ModelUpdateRequest, ProviderUpdateRequest
 
 
 settings = get_settings()
@@ -82,6 +82,7 @@ def _model_payload(provider: str | None = None) -> dict:
 async def startup_event() -> None:
     runtime = provider_runtime_config(settings)
     await event_logger.broadcast("mode_change", {"mode": current_mode()})
+    await event_logger.broadcast("capability_change", capability_config())
     await event_logger.broadcast("provider_change", runtime)
 
 
@@ -95,6 +96,7 @@ async def get_config() -> dict:
     runtime = provider_runtime_config(settings)
     return {
         "mode": current_mode(),
+        **capability_config(),
         "engine": settings.agent_engine,
         "provider": runtime["provider"],
         "model": runtime["model"],
@@ -131,6 +133,18 @@ async def set_mode(payload: ModeUpdateRequest) -> dict:
     return {"ok": True, "mode": mode}
 
 
+@app.get("/api/capabilities")
+async def get_capabilities() -> dict:
+    return capability_config()
+
+
+@app.post("/api/capabilities")
+async def set_capabilities(payload: CapabilityUpdateRequest) -> dict:
+    data = update_capabilities([item.model_dump() for item in payload.capabilities])
+    await event_logger.broadcast("capability_change", data)
+    return {"ok": True, **data}
+
+
 @app.post("/api/provider")
 async def set_provider(payload: ProviderUpdateRequest) -> dict:
     provider = update_provider(payload.provider)
@@ -161,6 +175,7 @@ async def reset_chat() -> dict:
     event_logger.clear()
     runtime = provider_runtime_config(settings)
     await event_logger.broadcast("mode_change", {"mode": current_mode()})
+    await event_logger.broadcast("capability_change", capability_config())
     await event_logger.broadcast("provider_change", runtime)
     return {"ok": True}
 

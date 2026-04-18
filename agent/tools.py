@@ -137,13 +137,6 @@ TOOL_DEFINITIONS = [
 ]
 
 
-def _normalize_path(path: str) -> Path:
-    raw = Path(path)
-    if raw.is_absolute():
-        return raw
-    return (settings.safe_dir / raw).resolve()
-
-
 def _normalize_url_for_runtime(url: str) -> str:
     parsed = urlparse(url)
     if parsed.hostname in {"localhost", "127.0.0.1"} and parsed.port == 8081:
@@ -193,8 +186,8 @@ def read_webpage(url: str) -> dict:
     }
 
 
-def list_files(path: str = ".") -> dict:
-    normalized = _normalize_path(path)
+def list_files(path: Path = Path(".")) -> dict:
+    normalized = path
     entries = []
     for child in sorted(normalized.iterdir(), key=lambda item: (not item.is_dir(), item.name.lower())):
         entries.append(
@@ -210,8 +203,8 @@ def list_files(path: str = ".") -> dict:
     }
 
 
-def read_file(path: str) -> dict:
-    normalized = _normalize_path(path)
+def read_file(path: Path) -> dict:
+    normalized = path
     return {
         "path": str(normalized),
         "content": normalized.read_text(encoding="utf-8"),

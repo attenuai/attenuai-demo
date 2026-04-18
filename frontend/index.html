@@ -30,9 +30,21 @@
               <button id="provider-badge" class="provider-toggle button-secondary" type="button">
                 <span id="provider-label">OpenAI</span>
               </button>
-              <button id="mode-badge" class="mode-toggle button-secondary" type="button" aria-label="Assistant mode">
-                <span id="mode-label">Loading...</span>
-              </button>
+              <div class="capability-picker">
+                <button id="capability-button" class="capability-toggle button-secondary" type="button" aria-haspopup="dialog" aria-expanded="false">
+                  <span id="capability-label">Capabilities</span>
+                </button>
+                <div id="capability-popup" class="model-popup capability-popup" hidden>
+                  <div class="popup-header">
+                    <p class="model-popup-title">Capabilities</p>
+                    <div class="popup-actions">
+                      <button id="capability-insecure-button" class="button-secondary popup-insecure-button" type="button">Insecure</button>
+                      <button id="capability-close-button" class="button-secondary popup-close-button" type="button">Close</button>
+                    </div>
+                  </div>
+                  <div id="capability-list" class="capability-list" role="group" aria-label="Capability selection"></div>
+                </div>
+              </div>
             </div>
           </div>
         </header>

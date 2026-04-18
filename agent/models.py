@@ -25,6 +25,17 @@ class ModeUpdateRequest(BaseModel):
     mode: ModeLiteral
 
 
+class CapabilityEntry(BaseModel):
+    id: str = Field(min_length=1, max_length=200)
+    checked: bool = True
+    value: str | None = Field(default=None, max_length=2000)
+    values: list[str] = Field(default_factory=list, max_length=50)
+
+
+class CapabilityUpdateRequest(BaseModel):
+    capabilities: list[CapabilityEntry] = Field(default_factory=list)
+
+
 class ProviderUpdateRequest(BaseModel):
     provider: ProviderLiteral
 

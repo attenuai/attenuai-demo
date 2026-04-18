@@ -25,8 +25,61 @@ class InteractionCanceled(Exception):
     pass
 
 
+class ToolExecutionFailed(Exception):
+    pass
+
+
+class ToolBlockedByPolicy(ToolExecutionFailed):
+    pass
+
+
 def _strip_leading_newlines(content: str) -> str:
     return content.lstrip("\r\n")
+
+
+async def _execute_tool_call(
+    name: str,
+    args: dict[str, Any],
+    cancel_context: CancelContext,
+) -> dict[str, Any]:
+    cancel_context.ensure_active()
+    await event_logger.broadcast(
+        "tool_call",
+        {
+            "name": name,
+            "args": args,
+            "status": "executing",
+            "danger_level": DANGER_RULES.get(name, "normal"),
+        },
+    )
+    try:
+        result = dispatch(name, args)
+    except Exception as exc:
+        cancel_context.ensure_active()
+        await event_logger.broadcast(
+            "tool_result",
+            {
+                "name": name,
+                "result": {"error": str(exc)},
+                "blocked": False,
+                "block_reason": None,
+            },
+        )
+        raise ToolExecutionFailed() from exc
+
+    cancel_context.ensure_active()
+    await event_logger.broadcast(
+        "tool_result",
+        {
+            "name": name,
+            "result": result,
+            "blocked": result.get("blocked", False),
+            "block_reason": result.get("reason"),
+        },
+    )
+    if result.get("blocked", False):
+        raise ToolBlockedByPolicy()
+    return result
 
 
 class CancelContext:
@@ -61,28 +114,7 @@ class OfflineDemoPlanner:
         )
 
     async def _call_tool(self, name: str, args: dict[str, Any], cancel_context: CancelContext) -> dict[str, Any]:
-        cancel_context.ensure_active()
-        await event_logger.broadcast(
-            "tool_call",
-            {
-                "name": name,
-                "args": args,
-                "status": "executing",
-                "danger_level": DANGER_RULES.get(name, "normal"),
-            },
-        )
-        result = dispatch(name, args)
-        cancel_context.ensure_active()
-        await event_logger.broadcast(
-            "tool_result",
-            {
-                "name": name,
-                "result": result,
-                "blocked": result.get("blocked", False),
-                "block_reason": result.get("reason"),
-            },
-        )
-        return result
+        return await _execute_tool_call(name, args, cancel_context)
 
     async def _handle_email_prompt(self, cancel_context: CancelContext) -> str:
         inbox = await self._call_tool("list_emails", {}, cancel_context)
@@ -169,28 +201,7 @@ class OpenAIAgentLoop:
         self.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
     async def _call_tool(self, name: str, args: dict[str, Any], cancel_context: CancelContext) -> dict[str, Any]:
-        cancel_context.ensure_active()
-        await event_logger.broadcast(
-            "tool_call",
-            {
-                "name": name,
-                "args": args,
-                "status": "executing",
-                "danger_level": DANGER_RULES.get(name, "normal"),
-            },
-        )
-        result = dispatch(name, args)
-        cancel_context.ensure_active()
-        await event_logger.broadcast(
-            "tool_result",
-            {
-                "name": name,
-                "result": result,
-                "blocked": result.get("blocked", False),
-                "block_reason": result.get("reason"),
-            },
-        )
-        return result
+        return await _execute_tool_call(name, args, cancel_context)
 
     async def handle(self, user_input: str, cancel_context: CancelContext | None = None) -> str:
         cancel_context = cancel_context or CancelContext()
@@ -229,7 +240,6 @@ class OpenAIAgentLoop:
                 cancel_context.ensure_active()
                 assistant_msg = _strip_leading_newlines(message.content or "I do not have a response yet.")
                 self.messages.append({"role": "assistant", "content": assistant_msg})
-                await event_logger.broadcast("assistant_message", {"content": assistant_msg})
                 return assistant_msg
 
             tool_call = tool_calls[0]
@@ -273,9 +283,19 @@ class AgentLoop:
         self._active_cancel_context = cancel_context
         await event_logger.broadcast("user_message", {"content": user_input})
         try:
-            if self.settings.agent_engine == "openai":
-                return await self.openai.handle(user_input, cancel_context)
-            reply = _strip_leading_newlines(await self.offline.handle(user_input, cancel_context))
+            try:
+                if self.settings.agent_engine == "openai":
+                    reply = await self.openai.handle(user_input, cancel_context)
+                else:
+                    reply = _strip_leading_newlines(await self.offline.handle(user_input, cancel_context))
+            except ToolBlockedByPolicy:
+                reply = (
+                    "The system has detected unapproved behavior. If you were processing unknown data, "
+                    "be aware that there may be malicious content in that data. All further actions "
+                    "have been stopped."
+                )
+            except ToolExecutionFailed:
+                reply = "Error."
             cancel_context.ensure_active()
             await event_logger.broadcast("assistant_message", {"content": reply})
             return reply

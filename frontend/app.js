@@ -11,21 +11,51 @@ const modelLabel = document.getElementById("model-label");
 const modelPopup = document.getElementById("model-popup");
 const modelSelect = document.getElementById("model-select");
 const modelApplyButton = document.getElementById("model-apply-button");
-const modeBadge = document.getElementById("mode-badge");
-const modeLabel = document.getElementById("mode-label");
+const capabilityButton = document.getElementById("capability-button");
+const capabilityLabel = document.getElementById("capability-label");
+const capabilityPopup = document.getElementById("capability-popup");
+const capabilityList = document.getElementById("capability-list");
+const capabilityInsecureButton = document.getElementById("capability-insecure-button");
+const capabilityCloseButton = document.getElementById("capability-close-button");
 const shieldOverlay = document.getElementById("shield-overlay");
 const shieldMessage = document.getElementById("shield-message");
 const exfilBanner = document.getElementById("exfil-banner");
+const BLOCKED_MESSAGE = "The system has detected unapproved behavior. If you were processing unknown data, be aware that there may be malicious content in that data. All further actions have been stopped.";
 
 let config = null;
 const pendingUserMessages = [];
 let pendingAssistantIndicator = null;
 let activeChatController = null;
+let draftCapabilities = [];
+let capabilitiesDirty = false;
+let chatLocked = false;
+
+function applyChatLockState() {
+  chatInput.disabled = Boolean(activeChatController) || chatLocked;
+  sendButton.disabled = chatLocked;
+  if (chatLocked) {
+    sendButton.textContent = "Locked";
+    chatInput.placeholder = "Start a new chat to continue.";
+    return;
+  }
+  sendButton.textContent = activeChatController ? "Stop" : "Send";
+  chatInput.placeholder = "";
+}
 
 function setChatPending(isPending) {
   activeChatController = isPending ? activeChatController : null;
-  sendButton.textContent = isPending ? "Stop" : "Send";
-  chatInput.disabled = isPending;
+  applyChatLockState();
+}
+
+function lockChat() {
+  chatLocked = true;
+  clearPendingAssistant();
+  applyChatLockState();
+}
+
+function unlockChat() {
+  chatLocked = false;
+  applyChatLockState();
 }
 
 async function cancelChatRequest() {
@@ -103,16 +133,237 @@ async function fetchModels() {
 }
 
 function applyMode(mode) {
-  const normalizedMode = mode === "secure" ? "secure" : "insecure";
-  modeBadge.dataset.mode = normalizedMode;
-  modeBadge.setAttribute("aria-checked", String(normalizedMode === "secure"));
-  modeLabel.textContent = normalizedMode === "secure" ? "Secure" : "Insecure";
+  if (!capabilityLabel) {
+    return;
+  }
+  const normalizedMode = mode === "insecure" ? "insecure" : "secure";
+  capabilityButton.dataset.mode = normalizedMode;
+  capabilityInsecureButton.dataset.mode = normalizedMode;
+  capabilityButton.setAttribute("aria-pressed", String(normalizedMode === "insecure"));
+  capabilityInsecureButton.setAttribute("aria-pressed", String(normalizedMode === "insecure"));
+  capabilityLabel.textContent = normalizedMode === "insecure" ? "Insecure" : "Capabilities";
 }
 
 function applyProvider(provider) {
   const normalizedProvider = provider === "local" ? "local" : "openai";
   providerBadge.dataset.provider = normalizedProvider;
   providerLabel.textContent = normalizedProvider === "local" ? "Local LLM" : "OpenAI";
+}
+
+function cloneCapabilities(capabilities = []) {
+  return capabilities.map((capability) => ({
+    ...capability,
+    ...(Array.isArray(capability.values) ? { values: [...capability.values] } : {}),
+  }));
+}
+
+function applyCapabilityButtonState(capabilities = []) {
+  const enabledCount = capabilities.filter((capability) => capability.checked).length;
+  capabilityButton.dataset.count = String(enabledCount);
+  capabilityButton.title = (config?.mode || "secure") === "insecure"
+    ? "Running without protection"
+    : `${enabledCount} capabilities enabled`;
+}
+
+function renderCapabilityOptions(capabilities = []) {
+  const isInsecure = (config?.mode || "secure") === "insecure";
+  capabilityList.textContent = "";
+  capabilityList.dataset.disabled = String(isInsecure);
+  capabilities.forEach((capability) => {
+    const label = document.createElement("label");
+    label.className = `capability-item${isInsecure ? " is-disabled" : ""}`;
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = capability.id;
+    checkbox.checked = Boolean(capability.checked);
+    checkbox.disabled = isInsecure;
+    checkbox.addEventListener("change", () => {
+      capability.checked = checkbox.checked;
+      capabilitiesDirty = true;
+      applyCapabilityButtonState(draftCapabilities);
+    });
+
+    const copy = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = capability.label;
+    const description = document.createElement("span");
+    description.textContent = capability.description;
+    copy.append(title, description);
+
+    if (typeof capability.value === "string") {
+      const input = document.createElement("input");
+      input.type = "text";
+      input.value = capability.value;
+      input.className = "capability-value-input";
+      input.placeholder = "Pattern";
+      input.disabled = isInsecure;
+      input.addEventListener("input", () => {
+        capability.value = input.value;
+        capabilitiesDirty = true;
+      });
+      copy.appendChild(input);
+    }
+
+    if (Array.isArray(capability.values)) {
+      const valuesWrapper = document.createElement("div");
+      valuesWrapper.className = "capability-values";
+
+      capability.values.forEach((subpath, index) => {
+        const row = document.createElement("div");
+        row.className = "capability-value-row";
+
+        const input = document.createElement("input");
+        input.type = "text";
+        input.value = subpath;
+        input.className = "capability-value-input";
+        input.placeholder = "/app/safe";
+        input.disabled = isInsecure;
+        input.addEventListener("input", () => {
+          capability.values[index] = input.value;
+          capabilitiesDirty = true;
+        });
+
+        const removeButton = document.createElement("button");
+        removeButton.type = "button";
+        removeButton.className = "capability-value-action button-secondary";
+        removeButton.textContent = "-";
+        removeButton.disabled = isInsecure || capability.values.length <= 1;
+        removeButton.setAttribute("aria-label", "Remove subpath");
+        removeButton.addEventListener("click", () => {
+          capability.values.splice(index, 1);
+          capabilitiesDirty = true;
+          renderCapabilityOptions(draftCapabilities);
+        });
+
+        row.append(input, removeButton);
+        valuesWrapper.appendChild(row);
+      });
+
+      const addButton = document.createElement("button");
+      addButton.type = "button";
+      addButton.className = "capability-add-button button-secondary";
+      addButton.textContent = "+";
+      addButton.disabled = isInsecure;
+      addButton.setAttribute("aria-label", "Add subpath");
+      addButton.addEventListener("click", () => {
+        capability.values.push("");
+        capabilitiesDirty = true;
+        renderCapabilityOptions(draftCapabilities);
+      });
+
+      copy.append(valuesWrapper, addButton);
+    }
+
+    label.append(checkbox, copy);
+    capabilityList.appendChild(label);
+  });
+}
+
+function closeCapabilityPopup() {
+  capabilityPopup.hidden = true;
+  capabilityButton.setAttribute("aria-expanded", "false");
+}
+
+function openCapabilityPopup() {
+  draftCapabilities = cloneCapabilities(config?.capabilities || []);
+  capabilitiesDirty = false;
+  renderCapabilityOptions(draftCapabilities);
+  capabilityPopup.hidden = false;
+  capabilityButton.setAttribute("aria-expanded", "true");
+}
+
+async function commitCapabilities() {
+  if ((config?.mode || "secure") === "insecure") {
+    closeCapabilityPopup();
+    return;
+  }
+
+  if (!capabilitiesDirty) {
+    closeCapabilityPopup();
+    return;
+  }
+
+  const previousCapabilities = cloneCapabilities(config?.capabilities || []);
+  const nextCapabilities = cloneCapabilities(draftCapabilities);
+  config = { ...(config || {}), capabilities: nextCapabilities, mode: "secure" };
+  applyCapabilityButtonState(nextCapabilities);
+  capabilityButton.disabled = true;
+  capabilityInsecureButton.disabled = true;
+  capabilityCloseButton.disabled = true;
+  try {
+    const response = await fetch("/api/capabilities", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        capabilities: nextCapabilities.map((capability) => ({
+          id: capability.id,
+          checked: Boolean(capability.checked),
+          ...(typeof capability.value === "string" ? { value: capability.value } : {}),
+          ...(Array.isArray(capability.values) ? { values: capability.values } : {}),
+        })),
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`Capability update failed with status ${response.status}`);
+    }
+    const payload = await response.json();
+    config = { ...(config || {}), capabilities: cloneCapabilities(payload.capabilities), mode: "secure" };
+    applyMode("secure");
+    applyCapabilityButtonState(config.capabilities);
+    closeCapabilityPopup();
+  } catch (error) {
+    config = { ...(config || {}), capabilities: previousCapabilities };
+    draftCapabilities = cloneCapabilities(previousCapabilities);
+    applyCapabilityButtonState(previousCapabilities);
+    renderCapabilityOptions(draftCapabilities);
+    console.error("Failed to update capabilities", error);
+  } finally {
+    capabilityButton.disabled = false;
+    capabilityInsecureButton.disabled = false;
+    capabilityCloseButton.disabled = false;
+  }
+}
+
+async function toggleInsecureMode() {
+  const previousMode = config?.mode === "insecure" ? "insecure" : "secure";
+  const nextMode = previousMode === "insecure" ? "secure" : "insecure";
+  const renderedCapabilities = draftCapabilities.length
+    ? draftCapabilities
+    : cloneCapabilities(config?.capabilities || []);
+
+  config = { ...(config || {}), mode: nextMode };
+  applyMode(nextMode);
+  applyCapabilityButtonState(config?.capabilities || []);
+  renderCapabilityOptions(renderedCapabilities);
+  capabilityButton.disabled = true;
+  capabilityInsecureButton.disabled = true;
+  capabilityCloseButton.disabled = true;
+  try {
+    const response = await fetch("/api/mode", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: nextMode }),
+    });
+    if (!response.ok) {
+      throw new Error(`Mode update failed with status ${response.status}`);
+    }
+    const payload = await response.json();
+    config = { ...(config || {}), mode: payload.mode };
+    applyMode(payload.mode);
+    applyCapabilityButtonState(config?.capabilities || []);
+    renderCapabilityOptions(renderedCapabilities);
+  } catch (error) {
+    config = { ...(config || {}), mode: previousMode };
+    applyMode(previousMode);
+    applyCapabilityButtonState(config?.capabilities || []);
+    renderCapabilityOptions(renderedCapabilities);
+    console.error("Failed to update mode", error);
+  } finally {
+    capabilityButton.disabled = false;
+    capabilityInsecureButton.disabled = false;
+    capabilityCloseButton.disabled = false;
+  }
 }
 
 const promptBuilders = {
@@ -159,6 +410,7 @@ function clearConversation() {
   shieldOverlay.hidden = true;
   exfilBanner.hidden = true;
   clearPendingAssistant();
+  unlockChat();
 }
 
 function appendMonitor(title, payload, level = "normal", blocked = false) {
@@ -198,6 +450,9 @@ async function loadConfig() {
   applyProvider(config.provider);
   applyModelLabel(config.model);
   populateModelOptions(config.models, config.model);
+  config.capabilities = cloneCapabilities(config.capabilities || []);
+  applyCapabilityButtonState(config.capabilities);
+  draftCapabilities = cloneCapabilities(config.capabilities);
 }
 
 function connectWebSocket() {
@@ -210,6 +465,7 @@ function connectWebSocket() {
     const { type, data } = envelope;
 
     if (type === "user_message") {
+      appendMonitor("user_message", data, "normal");
       if (pendingUserMessages[0] === data.content) {
         pendingUserMessages.shift();
         return;
@@ -220,7 +476,11 @@ function connectWebSocket() {
 
     if (type === "assistant_message") {
       clearPendingAssistant();
+      appendMonitor("assistant_message", data, "normal");
       appendChat("assistant", data.content);
+      if (data.content === BLOCKED_MESSAGE) {
+        lockChat();
+      }
       return;
     }
 
@@ -251,7 +511,23 @@ function connectWebSocket() {
     if (type === "mode_change") {
       config = { ...(config || {}), mode: data.mode };
       applyMode(data.mode);
+      applyCapabilityButtonState(config.capabilities || []);
+      if (!capabilityPopup.hidden) {
+        renderCapabilityOptions(draftCapabilities);
+      }
       appendMonitor("mode_change", data, "normal");
+      return;
+    }
+
+    if (type === "capability_change") {
+      config = { ...(config || {}), capabilities: cloneCapabilities(data.capabilities || []) };
+      applyMode(config.mode);
+      applyCapabilityButtonState(config.capabilities);
+      draftCapabilities = cloneCapabilities(config.capabilities);
+      if (!capabilityPopup.hidden) {
+        renderCapabilityOptions(draftCapabilities);
+      }
+      appendMonitor("capability_change", data, "normal");
       return;
     }
 
@@ -270,6 +546,10 @@ function connectWebSocket() {
 async function submitChatMessage() {
   if (activeChatController) {
     await cancelChatRequest();
+    return;
+  }
+
+  if (chatLocked) {
     return;
   }
 
@@ -303,7 +583,9 @@ async function submitChatMessage() {
     if (activeChatController === controller) {
       setChatPending(false);
     }
-    chatInput.focus();
+    if (!chatLocked) {
+      chatInput.focus();
+    }
   }
 }
 
@@ -422,37 +704,57 @@ modelApplyButton.addEventListener("click", async () => {
   }
 });
 
-document.addEventListener("click", (event) => {
-  if (modelPopup.hidden) {
+capabilityButton.addEventListener("click", () => {
+  if (capabilityPopup.hidden) {
+    openCapabilityPopup();
     return;
   }
-  if (modelPopup.contains(event.target) || modelButton.contains(event.target)) {
-    return;
-  }
-  closeModelPopup();
+  void commitCapabilities();
 });
 
-modeBadge.addEventListener("click", async () => {
-  const previousMode = modeBadge.dataset.mode === "secure" ? "secure" : "insecure";
-  const nextMode = modeBadge.dataset.mode === "secure" ? "insecure" : "secure";
-  config = { ...(config || {}), mode: nextMode };
-  applyMode(nextMode);
-  modeBadge.disabled = true;
-  try {
-    const response = await fetch("/api/mode", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: nextMode }),
-    });
-    if (!response.ok) {
-      throw new Error(`Mode update failed with status ${response.status}`);
+capabilityCloseButton.addEventListener("click", async () => {
+  await commitCapabilities();
+});
+
+capabilityInsecureButton.addEventListener("click", async () => {
+  await toggleInsecureMode();
+});
+
+capabilityPopup.addEventListener("click", (event) => {
+  event.stopPropagation();
+});
+
+capabilityButton.addEventListener("mousedown", (event) => {
+  event.stopPropagation();
+});
+
+document.addEventListener("click", (event) => {
+  if (!modelPopup.hidden) {
+    if (modelPopup.contains(event.target) || modelButton.contains(event.target)) {
+      return;
     }
-  } catch (error) {
-    config = { ...(config || {}), mode: previousMode };
-    applyMode(previousMode);
-    console.error("Failed to update mode", error);
-  } finally {
-    modeBadge.disabled = false;
+    closeModelPopup();
+    return;
+  }
+
+  if (!capabilityPopup.hidden) {
+    if (capabilityPopup.contains(event.target) || capabilityButton.contains(event.target)) {
+      return;
+    }
+    void commitCapabilities();
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") {
+    return;
+  }
+  if (!modelPopup.hidden) {
+    closeModelPopup();
+    return;
+  }
+  if (!capabilityPopup.hidden) {
+    void commitCapabilities();
   }
 });
 

@@ -166,48 +166,6 @@ def set_mode(mode: str) -> str:
     return _MODE
 
 
-def _ensure_internal_email(to: str) -> None:
-    recipient = to.strip().lower()
-    recipient_domain = recipient.split("@", 1)[1] if "@" in recipient else ""
-    if recipient_domain in internal_email_domains(settings):
-        return
-    raise PermissionError("Secure mode only allows email to internal recipients.")
-
-
-def _ensure_safe_rejection(index: int, message: str) -> None:
-    if not message.strip():
-        return
-    event = calendar.read_event(index)["event"]
-    organizer = event.get("organizer", "").strip().lower()
-    organizer_domain = organizer.split("@", 1)[1] if "@" in organizer else ""
-    if organizer_domain in internal_email_domains(settings):
-        return
-    raise PermissionError("Secure mode blocks rejection messages to external organizers.")
-
-
-def _ensure_safe_file_read(path: str) -> None:
-    normalized = _normalize_path(path)
-    try:
-        normalized.relative_to(settings.safe_dir.resolve())
-    except ValueError as exc:
-        raise PermissionError(f"Secure mode only allows files under {settings.safe_dir}.") from exc
-
-
-def secure_send_email(to: str, subject: str, body: str) -> dict:
-    _ensure_internal_email(to)
-    return send_email(to, subject, body)
-
-
-def secure_reject_calendar_invite(index: int, message: str = "") -> dict:
-    _ensure_safe_rejection(index, message)
-    return reject_calendar_invite(index, message)
-
-
-def secure_read_file(path: str) -> dict:
-    _ensure_safe_file_read(path)
-    return read_file(path)
-
-
 def list_emails() -> dict:
     return gmail.list_messages()
 
@@ -282,12 +240,4 @@ TOOLS = {
     "read_webpage": read_webpage,
     "list_files": list_files,
     "read_file": read_file,
-}
-
-
-SECURE_TOOLS = {
-    **TOOLS,
-    "send_email": secure_send_email,
-    "reject_calendar_invite": secure_reject_calendar_invite,
-    "read_file": secure_read_file,
 }

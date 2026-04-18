@@ -3,12 +3,12 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from tenuo import Pattern, SigningKey, Warrant, Wildcard
+from tenuo import Pattern, SigningKey, Warrant
 from tenuo.constraints import Subpath
 from config import get_settings
 from tools import DANGER_RULES, TOOL_DEFINITIONS, TOOLS
 
-_MODE = "secure"
+_MODE = "insecure"
 settings = get_settings()
 
 
@@ -24,41 +24,6 @@ def _load_keys():
 issuer_key, agent_key = _load_keys()
 
 CAPABILITY_DEFINITIONS = [
-    {
-        "id": "list_emails",
-        "label": "List emails",
-        "description": "Allow the agent to enumerate Alice's inbox.",
-        "apply": lambda builder: builder.capability("list_emails"),
-    },
-    {
-        "id": "read_email",
-        "label": "Read email",
-        "description": "Allow the agent to read any email by inbox index.",
-        "apply": lambda builder: builder.capability("read_email", index=Wildcard()),
-    },
-    {
-        "id": "send_email",
-        "label": "Send email",
-        "description": "Allow sending email, constrained to @acmecorp.com recipients.",
-        "apply": lambda builder: builder.capability(
-            "send_email",
-            to=Pattern("*@acmecorp.com"),
-            subject=Wildcard(),
-            body=Wildcard(),
-        ),
-    },
-    {
-        "id": "list_calendar_events",
-        "label": "List calendar events",
-        "description": "Allow the agent to enumerate Alice's calendar events.",
-        "apply": lambda builder: builder.capability("list_calendar_events"),
-    },
-    {
-        "id": "read_calendar_event",
-        "label": "Read calendar event",
-        "description": "Allow the agent to read any calendar event by index.",
-        "apply": lambda builder: builder.capability("read_calendar_event", index=Wildcard()),
-    },
     {
         "id": "read_webpage",
         "label": "Read webpage",
@@ -82,7 +47,7 @@ CAPABILITY_DEFINITIONS = [
     },
 ]
 _CAPABILITY_INDEX = {item["id"]: item for item in CAPABILITY_DEFINITIONS}
-_DEFAULT_CAPABILITIES = [item["id"] for item in CAPABILITY_DEFINITIONS]
+_DEFAULT_CAPABILITIES: list[str] = []
 _ACTIVE_CAPABILITIES = set(_DEFAULT_CAPABILITIES)
 _CAPABILITY_VALUES = {
     "read_webpage": "http://host.docker.internal:8081/*",
@@ -125,7 +90,9 @@ def _apply_capability(builder, capability_id: str):
     return _CAPABILITY_INDEX[capability_id]["apply"](builder)
 
 
-def _mint_bound_warrant(selected_capabilities: list[str]):
+def _mint_bound_warrant(selected_capabilities: list[str]) -> Warrant | None:
+    if not selected_capabilities:
+        return None
     builder = Warrant.mint_builder()
     for capability_id in selected_capabilities:
         builder = _apply_capability(builder, capability_id)
@@ -167,6 +134,14 @@ def dispatch(tool_name: str, args: dict) -> dict:
     validation_args = _serialize_args_for_validation(normalized_args)
     if current_mode() == "insecure":
         return tools[tool_name](**normalized_args)
+
+    if bound is None:
+        return {
+            "blocked": True,
+            "tool": tool_name,
+            "args": validation_args,
+            "reason": "No capabilities are currently granted.",
+        }
 
     result = bound.validate(tool_name, validation_args)
     if result.success:

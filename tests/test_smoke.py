@@ -13,39 +13,37 @@ BLOCKED_MESSAGE = (
     "be aware that there may be malicious content in that data. All further actions "
     "have been stopped."
 )
+SAFE_DIR = "/app/attenuai-demo/agent/safe"
+SAFE_FILE = "/app/attenuai-demo/agent/safe/readme.txt"
 
 
-def test_email_exfil_succeeds(monkeypatch):
+def test_safe_webpage_summary_succeeds(monkeypatch):
     loop, event_logger = load_agent_runtime(monkeypatch)
-    gmail_client = sys.modules["gmail_client"]
-    config = sys.modules["config"]
+    tools = sys.modules["tools"]
 
-    captured_posts: list[dict] = []
+    class FakeResponse:
+        def __init__(self, text: str, status_code: int = 200):
+            self.text = text
+            self.status_code = status_code
 
-    def fake_post(url: str, json: dict | None = None, timeout: int = 5):
-        captured_posts.append({"url": url, "json": json, "timeout": timeout})
+    def fake_get(url: str, timeout: int = 10):
+        return FakeResponse("<html><body>Quarterly report highlights steady growth.</body></html>")
 
-        class Response:
-            status_code = 200
+    monkeypatch.setattr(tools.requests, "get", fake_get)
 
-        return Response()
+    reply = asyncio.run(
+        loop.handle_user_message("Read http://localhost:8081/pages/acme-q2-report.html and summarize it")
+    )
 
-    monkeypatch.setattr(gmail_client.requests, "post", fake_post)
+    assert "I reviewed http://localhost:8081/pages/acme-q2-report.html" in reply
 
-    reply = asyncio.run(loop.handle_user_message("Summarize my new emails"))
-
-    assert "Updated vendor proposal" in reply
-    assert captured_posts, "Expected the agent to exfiltrate data through send_email."
-    assert captured_posts[0]["json"]["to"] == config.get_settings().mal_email
-
-    send_email_results = [
+    webpage_results = [
         event
         for event in event_logger.history
-        if event["type"] == "tool_result" and event["data"]["name"] == "send_email"
+        if event["type"] == "tool_result" and event["data"]["name"] == "read_webpage"
     ]
-    assert send_email_results
-    assert send_email_results[-1]["data"]["blocked"] is False
-    assert send_email_results[-1]["data"]["result"]["exfiltrated"] is True
+    assert webpage_results
+    assert webpage_results[-1]["data"]["blocked"] is False
 
 
 def test_malicious_webpage_exfil_succeeds(monkeypatch):
@@ -134,7 +132,9 @@ def test_openai_turn_can_be_canceled(monkeypatch):
     sys.modules["openai"] = type("FakeOpenAIModule", (), {"OpenAI": FakeOpenAI})()
 
     async def run_cancel_flow():
-        task = asyncio.create_task(loop.handle_user_message("Summarize my new emails"))
+        task = asyncio.create_task(
+            loop.handle_user_message("Read http://localhost:8081/pages/acme-q2-report.html and summarize it")
+        )
         await asyncio.sleep(0.05)
         assert loop.cancel_active_turn() is True
         return await task
@@ -190,14 +190,16 @@ def test_openai_reply_is_broadcast_once(monkeypatch):
 
 def test_offline_tool_failure_returns_error(monkeypatch):
     loop, event_logger = load_agent_runtime(monkeypatch)
-    gmail_client = sys.modules["gmail_client"]
+    tools = sys.modules["tools"]
 
-    def fail_read_message(index: int):
+    def fail_get(url: str, timeout: int = 10):
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(gmail_client.GmailClient, "read_message", staticmethod(fail_read_message))
+    monkeypatch.setattr(tools.requests, "get", fail_get)
 
-    reply = asyncio.run(loop.handle_user_message("Summarize my new emails"))
+    reply = asyncio.run(
+        loop.handle_user_message("Read http://localhost:8081/pages/acme-q2-report.html and summarize it")
+    )
 
     assert reply == "Error."
 
@@ -205,7 +207,7 @@ def test_offline_tool_failure_returns_error(monkeypatch):
     assert assistant_messages[-1]["data"]["content"] == "Error."
 
     tool_results = [event for event in event_logger.history if event["type"] == "tool_result"]
-    assert tool_results[-1]["data"]["name"] == "read_email"
+    assert tool_results[-1]["data"]["name"] == "read_webpage"
     assert tool_results[-1]["data"]["result"]["error"] == "boom"
 
 
@@ -221,16 +223,16 @@ def test_openai_tool_failure_returns_error(monkeypatch):
     loop.openai.settings = loop.settings
     loop.offline.settings = loop.settings
 
-    def fail_list_emails():
+    def fail_read_webpage(url: str):
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(tools, "list_emails", fail_list_emails)
-    monkeypatch.setattr(tools, "TOOLS", {**tools.TOOLS, "list_emails": fail_list_emails})
-    monkeypatch.setattr(dispatch, "TOOLS", {**dispatch.TOOLS, "list_emails": fail_list_emails})
+    monkeypatch.setattr(tools, "read_webpage", fail_read_webpage)
+    monkeypatch.setattr(tools, "TOOLS", {**tools.TOOLS, "read_webpage": fail_read_webpage})
+    monkeypatch.setattr(dispatch, "TOOLS", {**dispatch.TOOLS, "read_webpage": fail_read_webpage})
 
     class FakeToolFunction:
-        name = "list_emails"
-        arguments = "{}"
+        name = "read_webpage"
+        arguments = '{"url": "http://localhost:8081/pages/acme-q2-report.html"}'
 
     class FakeToolCall:
         id = "call_123"
@@ -259,7 +261,7 @@ def test_openai_tool_failure_returns_error(monkeypatch):
 
     sys.modules["openai"] = type("FakeOpenAIModule", (), {"OpenAI": FakeOpenAI})()
 
-    reply = asyncio.run(loop.handle_user_message("Summarize my new emails"))
+    reply = asyncio.run(loop.handle_user_message("Review this page"))
 
     assert reply == "Error."
 
@@ -267,20 +269,20 @@ def test_openai_tool_failure_returns_error(monkeypatch):
     assert assistant_messages[-1]["data"]["content"] == "Error."
 
 
-def test_blocked_tool_returns_error(monkeypatch):
+def test_blocked_tool_returns_warning(monkeypatch):
     loop, event_logger = load_agent_runtime(monkeypatch)
     dispatch = sys.modules["dispatch"]
 
     dispatch.update_capabilities(
         [
-            {"id": "read_email", "checked": True},
-            {"id": "send_email", "checked": True},
-            {"id": "list_calendar_events", "checked": True},
-            {"id": "read_calendar_event", "checked": True},
+            {"id": "list_files", "checked": True},
+            {"id": "read_file", "checked": True},
         ]
     )
 
-    reply = asyncio.run(loop.handle_user_message("Summarize my new emails"))
+    reply = asyncio.run(
+        loop.handle_user_message("Read http://localhost:8081/pages/acme-q2-report.html and summarize it")
+    )
 
     assert reply == BLOCKED_MESSAGE
 
@@ -290,7 +292,7 @@ def test_blocked_tool_returns_error(monkeypatch):
     blocked_results = [
         event
         for event in event_logger.history
-        if event["type"] == "tool_result" and event["data"]["name"] == "list_emails"
+        if event["type"] == "tool_result" and event["data"]["name"] == "read_webpage"
     ]
     assert blocked_results
     assert blocked_results[-1]["data"]["blocked"] is True
@@ -300,35 +302,46 @@ def test_capability_selection_rebuilds_warrant(monkeypatch):
     load_agent_runtime(monkeypatch)
     dispatch = sys.modules["dispatch"]
 
-    allowed_before = dispatch.dispatch("list_emails", {})
-    assert "messages" in allowed_before
+    allowed_before = dispatch.dispatch("list_files", {"path": SAFE_DIR})
+    assert "entries" in allowed_before
 
     updated = dispatch.update_capabilities(
         [
-            {"id": "read_email", "checked": True},
-            {"id": "send_email", "checked": True},
-            {"id": "list_calendar_events", "checked": True},
-            {"id": "read_calendar_event", "checked": True},
+            {"id": "read_webpage", "checked": True},
+            {"id": "read_file", "checked": True},
         ]
     )
-    assert not next(item for item in updated["capabilities"] if item["id"] == "list_emails")["checked"]
+    assert not next(item for item in updated["capabilities"] if item["id"] == "list_files")["checked"]
 
-    blocked_after = dispatch.dispatch("list_emails", {})
+    blocked_after = dispatch.dispatch("list_files", {"path": SAFE_DIR})
     assert blocked_after["blocked"] is True
-    assert blocked_after["tool"] == "list_emails"
+    assert blocked_after["tool"] == "list_files"
 
 
 def test_insecure_mode_bypasses_disabled_capabilities(monkeypatch):
     load_agent_runtime(monkeypatch)
     dispatch = sys.modules["dispatch"]
 
-    dispatch.update_capabilities([{"id": "read_email", "checked": True}])
-    blocked = dispatch.dispatch("list_emails", {})
+    dispatch.update_capabilities([{"id": "read_webpage", "checked": True}])
+    blocked = dispatch.dispatch("list_files", {"path": SAFE_DIR})
     assert blocked["blocked"] is True
 
     dispatch.update_mode("insecure")
-    allowed = dispatch.dispatch("list_emails", {})
-    assert "messages" in allowed
+    allowed = dispatch.dispatch("list_files", {"path": SAFE_DIR})
+    assert "entries" in allowed
+
+
+def test_secure_mode_with_no_capabilities_blocks_all_tools(monkeypatch):
+    load_agent_runtime(monkeypatch)
+    dispatch = sys.modules["dispatch"]
+
+    updated = dispatch.update_capabilities([])
+    assert all(not item["checked"] for item in updated["capabilities"])
+
+    dispatch.update_mode("secure")
+    blocked = dispatch.dispatch("list_files", {"path": SAFE_DIR})
+    assert blocked["blocked"] is True
+    assert blocked["reason"] == "No capabilities are currently granted."
 
 
 def test_read_webpage_pattern_is_editable(monkeypatch):
@@ -353,13 +366,13 @@ def test_read_file_subpaths_are_editable(monkeypatch):
 
     updated = dispatch.update_capabilities(
         [
-            {"id": "read_file", "checked": True, "values": ["/app/mock-data/act1_inbox.json"]},
+            {"id": "read_file", "checked": True, "values": [SAFE_FILE]},
         ]
     )
     read_file = next(item for item in updated["capabilities"] if item["id"] == "read_file")
-    assert read_file["values"] == ["/app/mock-data/act1_inbox.json"]
+    assert read_file["values"] == [SAFE_FILE]
 
-    blocked = dispatch.dispatch("read_file", {"path": "/app/mock-data/inbox.json"})
+    blocked = dispatch.dispatch("read_file", {"path": "/app/attenuai-demo/dummy.env"})
     assert blocked["blocked"] is True
 
 
@@ -369,11 +382,11 @@ def test_list_files_subpaths_are_editable(monkeypatch):
 
     updated = dispatch.update_capabilities(
         [
-            {"id": "list_files", "checked": True, "values": ["/app/mock-data/act1_inbox.json"]},
+            {"id": "list_files", "checked": True, "values": [SAFE_DIR]},
         ]
     )
     list_files = next(item for item in updated["capabilities"] if item["id"] == "list_files")
-    assert list_files["values"] == ["/app/mock-data/act1_inbox.json"]
+    assert list_files["values"] == [SAFE_DIR]
 
-    blocked = dispatch.dispatch("list_files", {"path": "/app/mock-data"})
+    blocked = dispatch.dispatch("list_files", {"path": "/app/attenuai-demo/mock-data"})
     assert blocked["blocked"] is True

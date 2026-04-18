@@ -1,5 +1,7 @@
 const chatLog = document.getElementById("chat-log");
 const monitorLog = document.getElementById("monitor-log");
+const appShell = document.querySelector(".app-shell");
+const paneResizer = document.getElementById("pane-resizer");
 const chatForm = document.getElementById("chat-form");
 const chatInput = document.getElementById("chat-input");
 const sendButton = document.getElementById("send-button");
@@ -21,6 +23,7 @@ const shieldOverlay = document.getElementById("shield-overlay");
 const shieldMessage = document.getElementById("shield-message");
 const exfilBanner = document.getElementById("exfil-banner");
 const BLOCKED_MESSAGE = "The system has detected unapproved behavior. If you were processing unknown data, be aware that there may be malicious content in that data. All further actions have been stopped.";
+const STACKED_LAYOUT_BREAKPOINT = 760;
 
 let config = null;
 const pendingUserMessages = [];
@@ -29,15 +32,42 @@ let activeChatController = null;
 let draftCapabilities = [];
 let capabilitiesDirty = false;
 let chatLocked = false;
+let isResizingPanes = false;
+
+function setPaneWidth(leftPercent) {
+  if (!appShell) {
+    return;
+  }
+  const clamped = Math.min(75, Math.max(25, leftPercent));
+  appShell.style.setProperty("--pane-left", `${clamped}%`);
+}
+
+function updatePaneWidthFromPointer(clientX) {
+  if (!appShell || window.innerWidth <= STACKED_LAYOUT_BREAKPOINT) {
+    return;
+  }
+  const bounds = appShell.getBoundingClientRect();
+  const leftPercent = ((clientX - bounds.left) / bounds.width) * 100;
+  setPaneWidth(leftPercent);
+}
+
+function stopPaneResize() {
+  if (!appShell || !isResizingPanes) {
+    return;
+  }
+  isResizingPanes = false;
+  appShell.classList.remove("is-resizing");
+}
 
 function applyChatLockState() {
   chatInput.disabled = Boolean(activeChatController) || chatLocked;
-  sendButton.disabled = chatLocked;
   if (chatLocked) {
-    sendButton.textContent = "Locked";
+    sendButton.disabled = false;
+    sendButton.textContent = "New Chat";
     chatInput.placeholder = "Start a new chat to continue.";
     return;
   }
+  sendButton.disabled = false;
   sendButton.textContent = activeChatController ? "Stop" : "Send";
   chatInput.placeholder = "";
 }
@@ -550,6 +580,7 @@ async function submitChatMessage() {
   }
 
   if (chatLocked) {
+    await resetChat();
     return;
   }
 
@@ -602,7 +633,7 @@ chatInput.addEventListener("keydown", (event) => {
   chatForm.requestSubmit();
 });
 
-newChatButton.addEventListener("click", async () => {
+async function resetChat() {
   newChatButton.disabled = true;
   try {
     if (activeChatController) {
@@ -615,6 +646,10 @@ newChatButton.addEventListener("click", async () => {
   } finally {
     newChatButton.disabled = false;
   }
+}
+
+newChatButton.addEventListener("click", async () => {
+  await resetChat();
 });
 
 providerBadge.addEventListener("click", async () => {
@@ -768,5 +803,38 @@ document.querySelectorAll("[data-prompt], [data-prompt-key]").forEach((button) =
     void submitChatMessage();
   });
 });
+
+window.addEventListener("pointermove", (event) => {
+  if (!isResizingPanes) {
+    return;
+  }
+  updatePaneWidthFromPointer(event.clientX);
+});
+
+window.addEventListener("pointerup", () => {
+  stopPaneResize();
+});
+
+window.addEventListener("pointercancel", () => {
+  stopPaneResize();
+});
+
+window.addEventListener("resize", () => {
+  if (window.innerWidth <= STACKED_LAYOUT_BREAKPOINT) {
+    stopPaneResize();
+  }
+});
+
+if (paneResizer) {
+  paneResizer.addEventListener("pointerdown", (event) => {
+    if (!appShell || window.innerWidth <= STACKED_LAYOUT_BREAKPOINT) {
+      return;
+    }
+    isResizingPanes = true;
+    appShell.classList.add("is-resizing");
+    paneResizer.setPointerCapture(event.pointerId);
+    updatePaneWidthFromPointer(event.clientX);
+  });
+}
 
 loadConfig().then(connectWebSocket);

@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-This repo is a local demo stack for the "Confused Deputy Showcase". Core application code lives in `agent/` (FastAPI app, agent loop, tool layers, config). The browser UI is a static frontend in `frontend/` with `index.html`, `style.css`, and `app.js`, served by the agent app. Supporting services live in `content-server/` and `mals-server/`. Test coverage is in `tests/`, mock inbox/calendar payloads are in `mock-data/`, and operational notes live in `docs/`. Use `scripts/boot_check.py` for end-to-end startup verification.
+This repo is a local demo stack for the "Confused Deputy Showcase". Core application code lives in `agent/` (FastAPI app, agent loop, tool layers, config). The browser UI is a static frontend in `frontend/` with `index.html`, `style.css`, and `app.js`, served by the agent app. Supporting services live in `content-server/` and `mals-server/`. Test coverage is in `tests/`, local demo assets are in `mock-data/`, and operational notes live in `docs/`. Use `scripts/boot_check.py` for end-to-end startup verification.
 
 ## Build, Test, and Development Commands
 Run the full stack with `docker compose up --build`.

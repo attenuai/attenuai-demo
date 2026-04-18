@@ -4,12 +4,12 @@ Hackathon-ready boilerplate for a 3-act demo that shows how prompt injection can
 
 ## What is included
 
-- `agent/` FastAPI backend, agent loop, tool dispatch, mock Gmail/calendar clients, and secure/insecure tool layers
+- `agent/` FastAPI backend, agent loop, tool dispatch, and secure/insecure tool layers
 - `frontend/` single-page split-screen UI for chat + live system monitor
 - `content-server/` safe and malicious pages for the webpage attack path
 - `mals-server/` live attacker dashboard that records exfiltrated requests
-- `mock-data/` act-based inbox and calendar payloads
-- `docs/` architecture notes and OAuth setup scaffolding
+- `mock-data/` local demo data and support files
+- `docs/` architecture notes
 
 By default, the repo runs in a fully local **offline demo mode** with mock data and a deterministic planner so you can iterate without an API key. If you want to wire in OpenAI later, the scaffolding is already there.
 
@@ -116,8 +116,6 @@ Notes:
 
 ## Suggested demo prompts
 
-- `Summarize my new emails`
-- `Check my calendar and flag anything unusual`
 - `Read http://localhost:8081/pages/acme-q2-report.html and summarize it`
 - `Read http://localhost:8081/pages/mal-ai-trends.html and summarize it`
 

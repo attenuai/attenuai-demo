@@ -22,6 +22,32 @@
         border-radius: 12px;
         margin-bottom: 20px;
       }
+      .header-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .header-row h1 {
+        margin: 0;
+      }
+      .clear-button {
+        border: 1px solid rgba(255, 77, 79, 0.45);
+        background: rgba(255, 77, 79, 0.12);
+        color: #ffb3b4;
+        border-radius: 10px;
+        padding: 10px 14px;
+        font: inherit;
+        cursor: pointer;
+      }
+      .clear-button:hover {
+        background: rgba(255, 77, 79, 0.2);
+      }
+      .clear-button:disabled {
+        cursor: wait;
+        opacity: 0.65;
+      }
       .entry {
         border: 1px solid rgba(255, 255, 255, 0.12);
         border-radius: 14px;
@@ -49,11 +75,15 @@
   </head>
   <body>
     <div class="banner">ATTACKER'S DATA COLLECTION SERVER</div>
-    <h1>Live Exfil Feed</h1>
+    <div class="header-row">
+      <h1>Live Exfil Feed</h1>
+      <button id="clear-button" class="clear-button" type="button">Clear feed</button>
+    </div>
     <div id="feed"></div>
 
     <script>
       const feed = document.getElementById("feed");
+      const clearButton = document.getElementById("clear-button");
       const seenEvents = new Set();
       let reconnectTimer = null;
       let socket = null;
@@ -114,6 +144,11 @@
         feed.prepend(wrapper);
       }
 
+      function clearFeed() {
+        seenEvents.clear();
+        feed.textContent = "";
+      }
+
       async function refreshHistory() {
         const response = await fetch("/api/events");
         if (!response.ok) {
@@ -137,7 +172,14 @@
         const protocol = window.location.protocol === "https:" ? "wss" : "ws";
         socket = new WebSocket(`${protocol}://${window.location.host}/ws`);
         socket.onopen = () => socket.send("ready");
-        socket.onmessage = (event) => render(JSON.parse(event.data));
+        socket.onmessage = (event) => {
+          const payload = JSON.parse(event.data);
+          if (payload.type === "cleared") {
+            clearFeed();
+            return;
+          }
+          render(payload);
+        };
         socket.onerror = () => socket.close();
         socket.onclose = () => scheduleReconnect();
       }
@@ -153,6 +195,21 @@
         }
         if (socket) {
           socket.close();
+        }
+      });
+
+      clearButton.addEventListener("click", async () => {
+        clearButton.disabled = true;
+        try {
+          const response = await fetch("/api/events/clear", { method: "POST" });
+          if (!response.ok) {
+            throw new Error(`Clear failed with status ${response.status}`);
+          }
+          clearFeed();
+        } catch (error) {
+          console.error("Failed to clear exfil dashboard", error);
+        } finally {
+          clearButton.disabled = false;
         }
       });
 

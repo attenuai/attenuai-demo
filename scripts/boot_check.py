@@ -13,9 +13,6 @@ from websockets.sync.client import connect
 
 ROOT = Path(__file__).resolve().parents[1]
 PYTHON = ROOT / ".venv" / "Scripts" / "python.exe"
-PROMPT = "Summarize my new emails"
-
-
 def start_service(module: str, app_dir: str, port: int, env: dict[str, str]) -> subprocess.Popen[str]:
     process_env = os.environ.copy()
     process_env.update(env)
@@ -75,6 +72,7 @@ def run_check(*, base_port: int) -> dict[str, object]:
     content_port = base_port + 81
     exfil_port = base_port + 82
     agent_port = base_port
+    prompt = f"Read http://127.0.0.1:{content_port}/pages/acme-q2-report.html and summarize it"
 
     content_process = start_service("server:app", "content-server", content_port, {})
     exfil_process = start_service("server:app", "mals-server", exfil_port, {})
@@ -98,7 +96,7 @@ def run_check(*, base_port: int) -> dict[str, object]:
 
         response = requests.post(
             f"http://127.0.0.1:{agent_port}/api/chat",
-            json={"message": PROMPT},
+            json={"message": prompt},
             timeout=15,
         )
         response.raise_for_status()
@@ -114,7 +112,7 @@ def run_check(*, base_port: int) -> dict[str, object]:
         expect(first_ws_event in {"mode_change", "user_message", "assistant_message", "tool_call", "tool_result"}, "WebSocket route did not yield an application event.")
         expect(chat["mode"] in {"secure", "insecure"}, "Chat response should include the active mode.")
         expect(config["mode"] in {"secure", "insecure"}, "Config should report the active mode.")
-        expect("Q2 Budget Numbers" in chat["reply"], "Boot check should summarize the inbox.")
+        expect(f"I reviewed http://127.0.0.1:{content_port}/pages/acme-q2-report.html" in chat["reply"], "Boot check should summarize the safe webpage.")
 
         return {
             "mode": chat["mode"],

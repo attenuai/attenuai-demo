@@ -5,99 +5,18 @@ from urllib.parse import urlparse, urlunparse
 
 import requests
 
-from calendar_client import CalendarClient
-from config import get_settings, internal_email_domains
-from gmail_client import GmailClient
+from config import get_settings
 
 
-gmail = GmailClient()
-calendar = CalendarClient()
 settings = get_settings()
 
 DANGER_RULES = {
-    "list_emails": "normal",
-    "read_email": "normal",
-    "send_email": "critical",
-    "list_calendar_events": "normal",
-    "read_calendar_event": "normal",
-    "reject_calendar_invite": "warning",
     "read_webpage": "normal",
     "list_files": "warning",
     "read_file": "critical",
 }
 
 TOOL_DEFINITIONS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "list_emails",
-            "description": "List all emails in Alice's inbox",
-            "parameters": {"type": "object", "properties": {}, "required": []},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "read_email",
-            "description": "Read the full content of an email by index",
-            "parameters": {
-                "type": "object",
-                "properties": {"index": {"type": "integer", "description": "Email index"}},
-                "required": ["index"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "send_email",
-            "description": "Send an email on behalf of Alice",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "to": {"type": "string"},
-                    "subject": {"type": "string"},
-                    "body": {"type": "string"},
-                },
-                "required": ["to", "subject", "body"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "list_calendar_events",
-            "description": "List today's calendar events for Alice",
-            "parameters": {"type": "object", "properties": {}, "required": []},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "read_calendar_event",
-            "description": "Read full details of a calendar event by index",
-            "parameters": {
-                "type": "object",
-                "properties": {"index": {"type": "integer", "description": "Event index"}},
-                "required": ["index"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "reject_calendar_invite",
-            "description": "Reject a calendar invite with an optional message",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "index": {"type": "integer"},
-                    "message": {"type": "string"},
-                },
-                "required": ["index"],
-            },
-        },
-    },
     {
         "type": "function",
         "function": {
@@ -147,31 +66,6 @@ def _normalize_url_for_runtime(url: str) -> str:
         return urlunparse(parsed._replace(scheme=target.scheme, netloc=target.netloc))
     return url
 
-
-def list_emails() -> dict:
-    return gmail.list_messages()
-
-
-def read_email(index: int) -> dict:
-    return gmail.read_message(index)
-
-
-def send_email(to: str, subject: str, body: str) -> dict:
-    return gmail.send_message(to, subject, body)
-
-
-def list_calendar_events() -> dict:
-    return calendar.list_events()
-
-
-def read_calendar_event(index: int) -> dict:
-    return calendar.read_event(index)
-
-
-def reject_calendar_invite(index: int, message: str = "") -> dict:
-    return calendar.reject_invite(index, message)
-
-
 def read_webpage(url: str) -> dict:
     runtime_url = _normalize_url_for_runtime(url)
     response = requests.get(runtime_url, timeout=10)
@@ -213,12 +107,6 @@ def read_file(path: Path) -> dict:
 
 
 TOOLS = {
-    "list_emails": list_emails,
-    "read_email": read_email,
-    "send_email": send_email,
-    "list_calendar_events": list_calendar_events,
-    "read_calendar_event": read_calendar_event,
-    "reject_calendar_invite": reject_calendar_invite,
     "read_webpage": read_webpage,
     "list_files": list_files,
     "read_file": read_file,

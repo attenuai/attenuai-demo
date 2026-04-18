@@ -46,6 +46,14 @@ async def get_events() -> list[dict]:
     return list(events)
 
 
+@app.post("/api/events/clear")
+async def clear_events() -> dict:
+    cleared = len(events)
+    events.clear()
+    await broadcast({"type": "cleared"})
+    return {"ok": True, "cleared": cleared}
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket) -> None:
     await websocket.accept()

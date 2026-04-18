@@ -14,9 +14,6 @@ PROJECT_ROOT = BASE_DIR.parent
 load_dotenv(PROJECT_ROOT / ".env")
 _PROVIDER = "openai"
 _MODEL_OVERRIDES: dict[str, str] = {}
-DEFAULT_ALICE_EMAIL = "alice.zhang@acmecorp.com"
-DEFAULT_BOB_EMAIL = "bob.chen@acmecorp.com"
-DEFAULT_MAL_EMAIL = "mal@evil.com"
 
 
 def _default_path(*candidates: Path) -> Path:
@@ -42,17 +39,9 @@ def _normalize_provider(raw_value: str) -> str:
     return "openai"
 
 
-def _normalize_email(raw_value: str, default: str) -> str:
-    value = raw_value.strip().lower()
-    return value or default
-
-
 @dataclass(frozen=True)
 class Settings:
     app_name: str
-    alice_email: str
-    bob_email: str
-    mal_email: str
     openai_api_key: str
     openai_model: str
     openai_model_local: str
@@ -71,9 +60,6 @@ class Settings:
 def get_settings() -> Settings:
     return Settings(
         app_name="Confused Deputy Showcase",
-        alice_email=_normalize_email(os.getenv("ALICE_EMAIL", ""), DEFAULT_ALICE_EMAIL),
-        bob_email=_normalize_email(os.getenv("BOB_EMAIL", ""), DEFAULT_BOB_EMAIL),
-        mal_email=_normalize_email(os.getenv("MAL_EMAIL", ""), DEFAULT_MAL_EMAIL),
         openai_api_key=os.getenv("OPENAI_API_KEY", "").strip(),
         openai_model=os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip(),
         openai_model_local=os.getenv("OPENAI_MODEL_LOCAL", "gpt-4o-mini").strip(),
@@ -102,34 +88,6 @@ def get_settings() -> Settings:
         ),
         safe_dir=Path(os.getenv("SAFE_DIR", str(_default_path(BASE_DIR / "safe", PROJECT_ROOT / "agent" / "safe")))),
     )
-
-
-def internal_email_domains(settings: Settings | None = None) -> set[str]:
-    active_settings = settings or get_settings()
-    domains = set()
-    for address in (active_settings.alice_email, active_settings.bob_email):
-        if "@" in address:
-            domains.add(address.split("@", 1)[1])
-    return domains
-
-
-def substitute_demo_emails(value, settings: Settings | None = None):
-    active_settings = settings or get_settings()
-    replacements = {
-        DEFAULT_ALICE_EMAIL: active_settings.alice_email,
-        DEFAULT_BOB_EMAIL: active_settings.bob_email,
-        DEFAULT_MAL_EMAIL: active_settings.mal_email,
-    }
-    if isinstance(value, str):
-        rendered = value
-        for source, target in replacements.items():
-            rendered = rendered.replace(source, target)
-        return rendered
-    if isinstance(value, list):
-        return [substitute_demo_emails(item, active_settings) for item in value]
-    if isinstance(value, dict):
-        return {key: substitute_demo_emails(item, active_settings) for key, item in value.items()}
-    return value
 
 
 def current_provider() -> str:

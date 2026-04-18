@@ -1,5 +1,7 @@
 :root {
   color-scheme: light dark;
+  --pane-left: 50%;
+  --resizer-width: 12px;
   --bg: #f3f6fb;
   --surface: #ffffff;
   --surface-soft: #eef2ff;
@@ -28,9 +30,17 @@ body {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns:
+    minmax(0, var(--pane-left))
+    var(--resizer-width)
+    minmax(0, calc(100% - var(--pane-left) - var(--resizer-width)));
   min-height: 100vh;
   height: 100vh;
+}
+
+.app-shell.is-resizing {
+  cursor: col-resize;
+  user-select: none;
 }
 
 .pane {
@@ -39,18 +49,42 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-width: 0;
   min-height: 0;
   overflow: hidden;
 }
 
 .pane-chat {
   background: rgba(255, 255, 255, 0.86);
-  border-right: 1px solid rgba(15, 23, 42, 0.08);
 }
 
 .pane-monitor {
   background: var(--terminal-bg);
   color: var(--terminal-text);
+}
+
+.pane-resizer {
+  position: relative;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.08) 0%, rgba(15, 23, 42, 0.16) 100%);
+  cursor: col-resize;
+}
+
+.pane-resizer::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 56px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.22);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.34);
+}
+
+.pane-resizer:hover::before,
+.app-shell.is-resizing .pane-resizer::before {
+  background: rgba(37, 99, 235, 0.55);
 }
 
 .pane-header {
@@ -547,10 +581,14 @@ body {
   }
 }
 
-@media (max-width: 980px) {
+@media (max-width: 760px) {
   .app-shell {
     grid-template-columns: 1fr;
     height: auto;
+  }
+
+  .pane-resizer {
+    display: none;
   }
 
   .shield-overlay {

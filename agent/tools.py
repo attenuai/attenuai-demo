@@ -13,7 +13,6 @@ from gmail_client import GmailClient
 gmail = GmailClient()
 calendar = CalendarClient()
 settings = get_settings()
-_MODE = "insecure"
 
 DANGER_RULES = {
     "list_emails": "normal",
@@ -154,16 +153,6 @@ def _normalize_url_for_runtime(url: str) -> str:
         target = urlparse(settings.exfil_server_url)
         return urlunparse(parsed._replace(scheme=target.scheme, netloc=target.netloc))
     return url
-
-
-def get_mode() -> str:
-    return _MODE
-
-
-def set_mode(mode: str) -> str:
-    global _MODE
-    _MODE = "secure" if mode == "secure" else "insecure"
-    return _MODE
 
 
 def list_emails() -> dict:

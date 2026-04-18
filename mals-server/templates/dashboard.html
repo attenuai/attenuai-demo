@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Attacker Dashboard</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: Consolas, monospace;
+        background: #050505;
+        color: #ff4d4f;
+        padding: 24px;
+      }
+      h1 {
+        margin-top: 0;
+      }
+      .banner {
+        padding: 12px 16px;
+        border: 1px solid rgba(255, 77, 79, 0.45);
+        background: rgba(255, 77, 79, 0.1);
+        border-radius: 12px;
+        margin-bottom: 20px;
+      }
+      .entry {
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 14px;
+        padding: 14px;
+        margin-bottom: 12px;
+        background: rgba(255, 255, 255, 0.03);
+      }
+      pre {
+        white-space: pre-wrap;
+        margin: 8px 0 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="banner">ATTACKER'S DATA COLLECTION SERVER</div>
+    <h1>Live Exfil Feed</h1>
+    <div id="feed"></div>
+
+    <script>
+      const feed = document.getElementById("feed");
+      const seenEvents = new Set();
+      let reconnectTimer = null;
+      let socket = null;
+
+      function eventKey(event) {
+        return JSON.stringify([
+          event.timestamp || "",
+          event.method || "",
+          event.url || "",
+          event.body || "",
+          event.payload || null,
+        ]);
+      }
+
+      function render(event) {
+        const key = eventKey(event);
+        if (seenEvents.has(key)) {
+          return;
+        }
+        seenEvents.add(key);
+
+        const wrapper = document.createElement("details");
+        wrapper.className = "entry";
+        wrapper.open = true;
+
+        const summary = document.createElement("summary");
+        summary.textContent = `${event.timestamp} - ${event.method} ${event.url}`;
+        wrapper.appendChild(summary);
+
+        const pre = document.createElement("pre");
+        pre.textContent = JSON.stringify(event, null, 2);
+        wrapper.appendChild(pre);
+
+        feed.prepend(wrapper);
+      }
+
+      async function refreshHistory() {
+        const response = await fetch("/api/events");
+        if (!response.ok) {
+          throw new Error(`Event fetch failed with status ${response.status}`);
+        }
+        const history = await response.json();
+        history.forEach(render);
+      }
+
+      function scheduleReconnect() {
+        if (reconnectTimer) {
+          return;
+        }
+        reconnectTimer = window.setTimeout(() => {
+          reconnectTimer = null;
+          connectSocket();
+        }, 1500);
+      }
+
+      function connectSocket() {
+        const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+        socket = new WebSocket(`${protocol}://${window.location.host}/ws`);
+        socket.onopen = () => socket.send("ready");
+        socket.onmessage = (event) => render(JSON.parse(event.data));
+        socket.onerror = () => socket.close();
+        socket.onclose = () => scheduleReconnect();
+      }
+
+      async function init() {
+        await refreshHistory();
+        connectSocket();
+      }
+
+      window.addEventListener("beforeunload", () => {
+        if (reconnectTimer) {
+          window.clearTimeout(reconnectTimer);
+        }
+        if (socket) {
+          socket.close();
+        }
+      });
+
+      void init().catch((error) => {
+        console.error("Failed to initialize exfil dashboard", error);
+      });
+    </script>
+  </body>
+</html>

@@ -17,18 +17,25 @@
           <div class="header-controls">
             <button id="new-chat-button" class="button-secondary" type="button">New chat</button>
             <div class="status-group">
-            <span id="mode-badge" class="badge">Loading...</span>
-            <span id="engine-badge" class="badge badge-muted">engine</span>
+              <div class="model-picker">
+                <button id="model-button" class="button-secondary model-button" type="button" aria-haspopup="dialog" aria-expanded="false">
+                  <span id="model-label">Model</span>
+                </button>
+                <div id="model-popup" class="model-popup" hidden>
+                  <p class="model-popup-title">Select model</p>
+                  <select id="model-select" aria-label="Available models"></select>
+                  <button id="model-apply-button" class="button-secondary" type="button">Apply model</button>
+                </div>
+              </div>
+              <button id="provider-badge" class="provider-toggle button-secondary" type="button">
+                <span id="provider-label">OpenAI</span>
+              </button>
+              <button id="mode-badge" class="mode-toggle button-secondary" type="button" aria-label="Assistant mode">
+                <span id="mode-label">Loading...</span>
+              </button>
             </div>
           </div>
         </header>
-
-        <div class="quick-actions">
-          <button data-prompt="Summarize my new emails">Summarize emails</button>
-          <button data-prompt="Check my calendar and flag anything unusual">Check calendar</button>
-          <button data-prompt-key="safe-webpage">Safe webpage</button>
-          <button data-prompt-key="malicious-webpage">Malicious webpage</button>
-        </div>
 
         <div id="chat-log" class="chat-log"></div>
 
@@ -36,6 +43,13 @@
           <textarea id="chat-input" placeholder="Type a message..." rows="3"></textarea>
           <button id="send-button" type="submit">Send</button>
         </form>
+
+        <div class="quick-actions">
+          <button data-prompt="Summarize my new emails">Summarize emails</button>
+          <button data-prompt="Check my calendar and flag anything unusual">Check calendar</button>
+          <button data-prompt-key="safe-webpage">Safe webpage</button>
+          <button data-prompt-key="malicious-webpage">Malicious webpage</button>
+        </div>
 
         <div id="shield-overlay" class="shield-overlay" hidden>
           <img src="/assets/shield.svg" alt="Shield" />

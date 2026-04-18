@@ -9,7 +9,7 @@ from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 
 
-app = FastAPI(title="Exfil Server")
+app = FastAPI(title="Mals Server")
 TEMPLATE_PATH = Path(__file__).resolve().parent / "templates" / "dashboard.html"
 events: deque[dict] = deque(maxlen=200)
 connections: set[WebSocket] = set()

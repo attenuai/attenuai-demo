@@ -6,16 +6,17 @@ services:
     env_file:
       - .env
     environment:
+      ALICE_EMAIL: ${ALICE_EMAIL:-alice.zhang@acmecorp.com}
+      BOB_EMAIL: ${BOB_EMAIL:-bob.chen@acmecorp.com}
+      MAL_EMAIL: ${MAL_EMAIL:-mal@evil.com}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
       AGENT_ENGINE: ${AGENT_ENGINE:-offline}
-      INSECURE: ${INSECURE:-1}
       USE_MOCK_DATA: ${USE_MOCK_DATA:-1}
-      CURRENT_ACT: ${CURRENT_ACT:-1}
       CONTENT_SERVER_URL: ${CONTENT_SERVER_URL:-http://content-server:8081}
-      EXFIL_SERVER_URL: ${EXFIL_SERVER_URL:-http://exfil-server:8082}
+      EXFIL_SERVER_URL: ${EXFIL_SERVER_URL:-http://mals-server:8082}
     extra_hosts:
-      - "exfil-server:host-gateway"
+      - "mals-server:host-gateway"
     volumes:
       - ./mock-data:/app/mock-data:ro
       - ./frontend:/app/frontend:ro
@@ -25,14 +26,14 @@ services:
       - "8000:8000"
     depends_on:
       - content-server
-      - exfil-server
+      - mals-server
 
   content-server:
     build: ./content-server
     ports:
       - "8081:8081"
 
-  exfil-server:
-    build: ./exfil-server
+  mals-server:
+    build: ./mals-server
     ports:
       - "8082:8082"

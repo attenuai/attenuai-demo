@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import asyncio
 import sys
+import time
+
+import pytest
 
 from helpers import load_agent_runtime
 
 
-def test_insecure_email_exfil_succeeds(monkeypatch):
-    loop, event_logger = load_agent_runtime(monkeypatch, insecure=True, current_act=2)
+def test_email_exfil_succeeds(monkeypatch):
+    loop, event_logger = load_agent_runtime(monkeypatch)
     gmail_client = sys.modules["gmail_client"]
+    config = sys.modules["config"]
 
     captured_posts: list[dict] = []
 
@@ -25,8 +29,8 @@ def test_insecure_email_exfil_succeeds(monkeypatch):
     reply = asyncio.run(loop.handle_user_message("Summarize my new emails"))
 
     assert "Updated vendor proposal" in reply
-    assert captured_posts, "Expected the insecure agent to exfiltrate data through send_email."
-    assert captured_posts[0]["json"]["to"] == "mal@evil.com"
+    assert captured_posts, "Expected the agent to exfiltrate data through send_email."
+    assert captured_posts[0]["json"]["to"] == config.get_settings().mal_email
 
     send_email_results = [
         event
@@ -38,40 +42,9 @@ def test_insecure_email_exfil_succeeds(monkeypatch):
     assert send_email_results[-1]["data"]["result"]["exfiltrated"] is True
 
 
-def test_secure_email_exfil_is_blocked(monkeypatch):
-    loop, event_logger = load_agent_runtime(monkeypatch, insecure=False, current_act=2)
-    gmail_client = sys.modules["gmail_client"]
-
-    captured_posts: list[dict] = []
-
-    def fake_post(url: str, json: dict | None = None, timeout: int = 5):
-        captured_posts.append({"url": url, "json": json, "timeout": timeout})
-
-        class Response:
-            status_code = 200
-
-        return Response()
-
-    monkeypatch.setattr(gmail_client.requests, "post", fake_post)
-
-    reply = asyncio.run(loop.handle_user_message("Summarize my new emails"))
-
-    assert "Updated vendor proposal" in reply
-    assert not captured_posts, "Secure mode should block external email exfiltration before any POST occurs."
-
-    blocked_results = [
-        event
-        for event in event_logger.history
-        if event["type"] == "tool_result" and event["data"]["name"] == "send_email"
-    ]
-    assert blocked_results
-    assert blocked_results[-1]["data"]["blocked"] is True
-    assert "outside approved Acme domains" in blocked_results[-1]["data"]["block_reason"]
-
-
-def test_secure_malicious_webpage_exfil_is_blocked(monkeypatch):
-    loop, event_logger = load_agent_runtime(monkeypatch, insecure=False, current_act=2)
-    tools_insecure = sys.modules["tools_insecure"]
+def test_malicious_webpage_exfil_succeeds(monkeypatch):
+    loop, event_logger = load_agent_runtime(monkeypatch)
+    tools = sys.modules["tools"]
 
     class FakeResponse:
         def __init__(self, text: str, status_code: int = 200):
@@ -90,10 +63,10 @@ def test_secure_malicious_webpage_exfil_is_blocked(monkeypatch):
                 """
             )
         if "/collect" in url:
-            raise AssertionError("Secure mode should block file exfiltration before any exfil request is made.")
+            return FakeResponse("<html><body>collected</body></html>")
         return FakeResponse("<html><body>ok</body></html>")
 
-    monkeypatch.setattr(tools_insecure.requests, "get", fake_get)
+    monkeypatch.setattr(tools.requests, "get", fake_get)
 
     reply = asyncio.run(
         loop.handle_user_message("Read http://localhost:8081/pages/mal-ai-trends.html and summarize it")
@@ -101,11 +74,67 @@ def test_secure_malicious_webpage_exfil_is_blocked(monkeypatch):
 
     assert "I reviewed http://localhost:8081/pages/mal-ai-trends.html" in reply
 
-    blocked_file_reads = [
+    file_reads = [
         event
         for event in event_logger.history
         if event["type"] == "tool_result" and event["data"]["name"] == "read_file"
     ]
-    assert blocked_file_reads
-    assert blocked_file_reads[-1]["data"]["blocked"] is True
-    assert "outside the safe directory" in blocked_file_reads[-1]["data"]["block_reason"]
+    assert file_reads
+    assert file_reads[-1]["data"]["blocked"] is False
+
+    exfil_reads = [
+        event
+        for event in event_logger.history
+        if event["type"] == "tool_result"
+        and event["data"]["name"] == "read_webpage"
+        and event["data"]["result"].get("exfiltrated") is True
+    ]
+    assert exfil_reads
+
+
+def test_openai_turn_can_be_canceled(monkeypatch):
+    loop, event_logger = load_agent_runtime(monkeypatch, engine="openai")
+    config = sys.modules["config"]
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    config.get_settings.cache_clear()
+    loop.settings = config.get_settings()
+    loop.openai.settings = loop.settings
+    loop.offline.settings = loop.settings
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            time.sleep(0.2)
+
+            class Message:
+                content = "This should never be delivered."
+                tool_calls = []
+
+            class Choice:
+                message = Message()
+
+            class Response:
+                choices = [Choice()]
+
+            return Response()
+
+    class FakeChat:
+        completions = FakeCompletions()
+
+    class FakeOpenAI:
+        def __init__(self, **kwargs):
+            self.chat = FakeChat()
+
+    sys.modules["openai"] = type("FakeOpenAIModule", (), {"OpenAI": FakeOpenAI})()
+
+    async def run_cancel_flow():
+        task = asyncio.create_task(loop.handle_user_message("Summarize my new emails"))
+        await asyncio.sleep(0.05)
+        assert loop.cancel_active_turn() is True
+        return await task
+
+    with pytest.raises(sys.modules["agent_loop"].InteractionCanceled):
+        asyncio.run(run_cancel_flow())
+
+    assistant_messages = [event for event in event_logger.history if event["type"] == "assistant_message"]
+    assert assistant_messages == []

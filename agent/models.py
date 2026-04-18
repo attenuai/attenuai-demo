@@ -6,6 +6,10 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 
+ModeLiteral = Literal["secure", "insecure"]
+ProviderLiteral = Literal["openai", "local"]
+
+
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
 
@@ -13,7 +17,20 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     reply: str
     engine: str
-    mode: Literal["insecure", "secure"]
+    mode: ModeLiteral
+    provider: ProviderLiteral
+
+
+class ModeUpdateRequest(BaseModel):
+    mode: ModeLiteral
+
+
+class ProviderUpdateRequest(BaseModel):
+    provider: ProviderLiteral
+
+
+class ModelUpdateRequest(BaseModel):
+    model: str = Field(min_length=1, max_length=200)
 
 
 class EventEnvelope(BaseModel):

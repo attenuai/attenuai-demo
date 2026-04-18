@@ -15,25 +15,26 @@ if str(AGENT_DIR) not in sys.path:
 def load_agent_runtime(
     monkeypatch,
     *,
-    insecure: bool,
-    current_act: int = 2,
     engine: str = "offline",
     content_server_url: str = "http://localhost:8081",
     exfil_server_url: str = "http://localhost:8082",
+    alice_email: str = "alice.zhang@acmecorp.com",
+    bob_email: str = "bob.chen@acmecorp.com",
+    mal_email: str = "mal@evil.com",
 ):
-    monkeypatch.setenv("INSECURE", "1" if insecure else "0")
-    monkeypatch.setenv("CURRENT_ACT", str(current_act))
     monkeypatch.setenv("USE_MOCK_DATA", "1")
     monkeypatch.setenv("AGENT_ENGINE", engine)
     monkeypatch.setenv("CONTENT_SERVER_URL", content_server_url)
     monkeypatch.setenv("EXFIL_SERVER_URL", exfil_server_url)
+    monkeypatch.setenv("ALICE_EMAIL", alice_email)
+    monkeypatch.setenv("BOB_EMAIL", bob_email)
+    monkeypatch.setenv("MAL_EMAIL", mal_email)
 
     for module_name in [
         "main",
         "agent_loop",
         "dispatch",
-        "tools_secure",
-        "tools_insecure",
+        "tools",
         "gmail_client",
         "calendar_client",
         "logger",

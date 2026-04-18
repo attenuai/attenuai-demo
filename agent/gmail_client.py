@@ -6,7 +6,7 @@ from pathlib import Path
 
 import requests
 
-from config import get_settings
+from config import get_settings, internal_email_domains, substitute_demo_emails
 
 
 class GmailClient:
@@ -14,8 +14,8 @@ class GmailClient:
         self.settings = get_settings()
 
     def _load_mock_messages(self) -> list[dict]:
-        act_path = self.settings.mock_data_dir / f"act{self.settings.current_act}_inbox.json"
-        return json.loads(act_path.read_text(encoding="utf-8"))
+        inbox_path = self.settings.mock_data_dir / "inbox.json"
+        return substitute_demo_emails(json.loads(inbox_path.read_text(encoding="utf-8")), self.settings)
 
     def list_messages(self) -> dict:
         messages = self._load_mock_messages()
@@ -38,7 +38,8 @@ class GmailClient:
         return {"message": messages[index], "source": "mock"}
 
     def send_message(self, to: str, subject: str, body: str) -> dict:
-        exfiltrated = not to.lower().endswith("@acmecorp.com")
+        recipient_domain = to.lower().split("@", 1)[1] if "@" in to else ""
+        exfiltrated = recipient_domain not in internal_email_domains(self.settings)
         if exfiltrated:
             try:
                 requests.post(

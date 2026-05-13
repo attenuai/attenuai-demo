@@ -2,6 +2,8 @@
 
 This project demonstrates an AI agent that is intentionally vulnerable to prompt injection attacks and an easy method to minimize or eliminate damage by using Capabilities-Based security, in this case, using [tenuo](https://github.com/tenuo-ai/tenuo). The agent can use OpenAI (you supply the API key) or a local LLM. It has only been tested in Docker.
 
+[Video demo](https://www.youtube.com/watch?v=ihNMMc6LrSc)
+
 ## Quick start
 
 ```
